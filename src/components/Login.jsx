@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './Login.css';
 
-const Login = ({ onLogin, onSwitchToRegister }) => {
+const Login = ({ onLogin }) => {
   const [formData, setFormData] = useState({
     username: '',
     password: ''
@@ -32,17 +32,36 @@ const Login = ({ onLogin, onSwitchToRegister }) => {
     }
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // For demo purposes, accept any non-empty credentials
-      if (formData.username.trim() && formData.password.trim()) {
-        onLogin && onLogin(formData.username);
+      // Connect to Django backend API
+      const response = await fetch('http://localhost:8000/api/auth/login/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: formData.username,
+          password: formData.password
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Store token in localStorage
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+
+        // Determine user role (admin if superuser/staff)
+        const userRole = data.user.is_admin ? 'admin' : 'user';
+
+        // Notify app (username, role, fullUser, dashboardUrl)
+        onLogin && onLogin(data.user.username, userRole, data.user, data.dashboard_url);
       } else {
-        setError('Invalid username or password');
+        setError(data.error || 'Login failed. Please check your credentials.');
       }
-    } catch {
-      setError('Login failed. Please try again.');
+    } catch (error) {
+      console.error('Login error:', error);
+      setError('Unable to connect to server. Please try again later.');
     } finally {
       setIsLoading(false);
     }
@@ -126,20 +145,10 @@ const Login = ({ onLogin, onSwitchToRegister }) => {
                   'Sign In'
                 )}
               </button>
-
-              <button 
-                type="button" 
-                className="register-switch-button"
-                onClick={onSwitchToRegister}
-                disabled={isLoading}
-              >
-                Create New Account
-              </button>
             </div>
           </form>
 
           <div className="login-footer">
-            <p>Don't have an account? <button className="link-button" onClick={onSwitchToRegister}>Sign up here</button></p>
             <p>© 2025 PSMS. All rights reserved.</p>
           </div>
         </div>

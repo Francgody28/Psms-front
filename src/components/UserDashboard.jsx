@@ -35,6 +35,16 @@ const SimpleUserDashboard = ({ user, onLogout }) => {
     }
   };
 
+  const handleAddStatistics = () => {
+    // TODO: Navigate to add statistics page or open modal
+    console.log('Add Statistics clicked');
+  };
+
+  const handleAddPlan = () => {
+    // TODO: Navigate to add plan page or open modal
+    console.log('Add Plan clicked');
+  };
+
   if (loading) {
     return <div className="dashboard-loading">Loading dashboard...</div>;
   }
@@ -49,7 +59,7 @@ const SimpleUserDashboard = ({ user, onLogout }) => {
       <div className="dashboard-content">
         <div className="welcome-card">
           <h2>Planning & Statistics Management System</h2>
-          <p>Welcome to your personal dashboard. Here you can manage your tasks, view statistics, and access planning tools.</p>
+          <p>Welcome employee. Here you can manage your tasks, view statistics, and access planning tools.</p>
         </div>
 
         <div className="stats">
@@ -68,25 +78,25 @@ const SimpleUserDashboard = ({ user, onLogout }) => {
         </div>
 
         <div className="quick-actions">
+          <div className="action-card" onClick={handleAddStatistics}>
+            <h4>Add Statistics</h4>
+            <p>Create and manage your statistical data</p>
+          </div>
+          <div className="action-card" onClick={handleAddPlan}>
+            <h4>Add Plan</h4>
+            <p>Create new planning schedules and goals</p>
+          </div>
           <div className="action-card">
-            <div className="icon">📊</div>
             <h4>View Statistics</h4>
             <p>Access your personal statistics and reports</p>
           </div>
           <div className="action-card">
-            <div className="icon">📝</div>
             <h4>Create Task</h4>
             <p>Add new tasks to your planning schedule</p>
           </div>
           <div className="action-card">
-            <div className="icon">📈</div>
             <h4>Reports</h4>
             <p>Generate and view your progress reports</p>
-          </div>
-          <div className="action-card">
-            <div className="icon">⚙️</div>
-            <h4>Settings</h4>
-            <p>Customize your dashboard preferences</p>
           </div>
         </div>
 
@@ -107,28 +117,6 @@ const SimpleUserDashboard = ({ user, onLogout }) => {
           ) : (
             <p>No recent activity to display.</p>
           )}
-        </div>
-
-        <div className="profile-section">
-          <h3>Profile Information</h3>
-          <div className="profile-info">
-            <div className="profile-field">
-              <label>Username:</label>
-              <span>{user.username}</span>
-            </div>
-            <div className="profile-field">
-              <label>Email:</label>
-              <span>{user.email}</span>
-            </div>
-            <div className="profile-field">
-              <label>Full Name:</label>
-              <span>{`${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Not provided'}</span>
-            </div>
-            <div className="profile-field">
-              <label>Member Since:</label>
-              <span>{user.date_joined ? new Date(user.date_joined).toLocaleDateString() : 'N/A'}</span>
-            </div>
-          </div>
         </div>
       </div>
     </div>

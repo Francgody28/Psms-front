@@ -78,8 +78,8 @@ const AdminDashboard = ({ user, onLogout }) => {
     }
 
     // Password validation
-    if (newUser.password.length < 6) {
-      setRegistrationError('Password must be at least 6 characters long');
+    if (newUser.password.length < 8) {
+      setRegistrationError('Password must be at least 8 characters long');
       return;
     }
 
@@ -90,9 +90,9 @@ const AdminDashboard = ({ user, onLogout }) => {
     }
 
     try {
-      console.log('📤 Sending user data:', newUser);
+      console.log('Sending user data:', newUser);
       const response = await api.registerUser(newUser);
-      console.log('✅ Registration successful:', response);
+      console.log('Registration successful:', response);
       
       setShowRegisterForm(false);
       setNewUser({
@@ -153,14 +153,14 @@ const AdminDashboard = ({ user, onLogout }) => {
             onClick={() => setShowRegisterForm(!showRegisterForm)}
             className="register-btn"
           >
-            {showRegisterForm ? 'Cancel' : 'Register New User'}
+            {showRegisterForm ? 'Cancel' : 'Register New Employee'}
           </button>
         </div>
 
         {showRegisterForm && (
           <form onSubmit={handleRegisterUser} className="register-form">
-            <h3>Register New User</h3>
-            
+            <h3>Register New Employee</h3>
+
             {registrationError && (
               <div className="error-message" style={{
                 background: '#fee', 
@@ -201,7 +201,7 @@ const AdminDashboard = ({ user, onLogout }) => {
               onChange={(e) => setNewUser({...newUser, password_confirm: e.target.value})}
               required
             />
-            <button type="submit">Register User</button>
+            <button type="submit">Register Employee</button>
           </form>
         )}
 

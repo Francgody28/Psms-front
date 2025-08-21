@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import Login from './components/Login'
 import Register from './components/Register'
-import Dashboard from './components/Dashboard'
 import SimpleUserDashboard from './components/UserDashboard'
 import AdminDashboard from './components/AdminDashboard'
 import './App.css'
@@ -13,17 +12,16 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [showRegister, setShowRegister] = useState(false)
 
-  console.log('🚀 App render state:', { isAuthenticated, userRole, user, userData });
+  console.log('App render state:', { isAuthenticated, userRole, user, userData });
 
   const handleLogin = (username, role, fullUserData, dashboardUrl) => {
-    console.log('🔄 App handleLogin called with:', { username, role, fullUserData, dashboardUrl });
-    
+    console.log('App handleLogin called with:', { username, role, fullUserData, dashboardUrl });
     setUser(username)
     setUserRole(role)
     setUserData(fullUserData)
     setIsAuthenticated(true)
     
-    console.log('✅ Login successful, role set to:', role);
+    console.log(' Login successful, role set to:', role);
   }
 
   const handleRegister = () => {
@@ -53,7 +51,7 @@ function App() {
 
   // If showing register form (public registration)
   if (showRegister) {
-    console.log('📝 Showing public register form');
+    console.log('Showing public register form');
     return (
       <Register 
         onRegisterSuccess={handleRegister}
@@ -64,13 +62,13 @@ function App() {
 
   // If not authenticated, show login
   if (!isAuthenticated) {
-    console.log('🔓 Not authenticated - showing login');
+    console.log('Not authenticated - showing login');
     return <Login onLogin={handleLogin} onShowRegister={showRegisterForm} />
   }
 
   // Role-based dashboard routing
   if (userRole === 'admin') {
-    console.log('🔧 Rendering AdminDashboard for admin user');
+    console.log('Rendering AdminDashboard for admin user');
     return (
       <AdminDashboard 
         user={userData || { username: user }}
@@ -88,7 +86,7 @@ function App() {
   }
 
   // Fallback (should not reach here normally)
-  console.log('⚠️ No matching role, showing login');
+  console.log(' No matching role, showing login');
   return <Login onLogin={handleLogin} />
 }
 

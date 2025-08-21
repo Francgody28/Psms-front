@@ -275,72 +275,255 @@
   background: linear-gradient(135deg, #5a6fd8, #6a5b9a);
 }
 
+.edit-form {
+  background: #f8f9fa;
+  border: 2px solid #007bff;
+  border-radius: 8px;
+  padding: 25px;
+  margin: 20px 0;
+  box-shadow: 0 4px 6px rgba(0, 123, 255, 0.1);
+}
+
+.edit-form h3 {
+  color: #007bff;
+  margin-bottom: 20px;
+  font-size: 1.3em;
+  border-bottom: 2px solid #007bff;
+  padding-bottom: 10px;
+}
+
+.edit-form input {
+  width: 100%;
+  padding: 12px 15px;
+  margin-bottom: 15px;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  font-size: 16px;
+  transition: border-color 0.3s ease;
+  box-sizing: border-box;
+}
+
+.edit-form input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.edit-form input::placeholder {
+  color: #6c757d;
+  font-style: italic;
+}
+
+.form-buttons {
+  display: flex;
+  gap: 15px;
+  margin-top: 20px;
+  justify-content: flex-start;
+}
+
+.form-buttons button {
+  padding: 12px 25px;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 120px;
+}
+
+.form-buttons button[type="submit"] {
+  background: #28a745;
+  color: white;
+}
+
+.form-buttons button[type="submit"]:hover {
+  background: #218838;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
+}
+
+.cancel-btn {
+  background: #6c757d !important;
+  color: white !important;
+}
+
+.cancel-btn:hover {
+  background: #5a6268 !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(108, 117, 125, 0.3);
+}
+
+/* Improve user list styling */
 .users-list {
-  background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
-  padding: 2rem;
-  border-radius: 25px;
-  box-shadow: 0 15px 35px rgba(102, 126, 234, 0.1);
-  border: 1px solid rgba(102, 126, 234, 0.1);
-  margin: 0 3rem;
+  margin-top: 30px;
 }
 
 .users-list h3 {
-  margin: 0 0 2rem 0;
-  color: #2d3748;
-  font-size: 1.5rem;
-  font-weight: 700;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  border-bottom: 3px solid rgba(102, 126, 234, 0.1);
-  padding-bottom: 1rem;
+  color: #343a40;
+  border-bottom: 2px solid #dee2e6;
+  padding-bottom: 10px;
+  margin-bottom: 20px;
 }
 
 .user-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1.5rem;
-  border-bottom: 1px solid rgba(102, 126, 234, 0.1);
+  padding: 15px;
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease;
-  border-radius: 10px;
-  margin-bottom: 1rem;
-}
-
-.user-item:last-child {
-  border-bottom: none;
-  margin-bottom: 0;
 }
 
 .user-item:hover {
-  background: rgba(102, 126, 234, 0.05);
-  transform: translateX(10px);
-  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
 }
 
-.user-item span:first-child {
-  color: #2d3748;
+.user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.user-info span:first-child {
   font-weight: 600;
-  font-size: 1rem;
+  color: #343a40;
+  font-size: 16px;
 }
 
-.active {
-  color: #38a169;
-  font-weight: 700;
-  background: rgba(56, 161, 105, 0.1);
-  padding: 0.5rem 1rem;
-  border-radius: 15px;
+.user-info .active {
+  color: #28a745;
+  font-weight: 500;
+  font-size: 14px;
 }
 
-.inactive {
-  color: #e53e3e;
-  font-weight: 700;
-  background: rgba(229, 62, 62, 0.1);
-  padding: 0.5rem 1rem;
-  border-radius: 15px;
+.user-info .inactive {
+  color: #dc3545;
+  font-weight: 500;
+  font-size: 14px;
 }
 
+.user-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.edit-btn, .delete-btn {
+  padding: 8px 16px !important;
+  border-radius: 5px !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  transition: all 0.3s ease !important;
+  border: none !important;
+  cursor: pointer !important;
+}
+
+.edit-btn:hover {
+  background: #0056b3 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 6px rgba(0, 123, 255, 0.3);
+}
+
+.delete-btn:hover:not(:disabled) {
+  background: #c82333 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 6px rgba(220, 53, 69, 0.3);
+}
+
+.delete-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed !important;
+}
+
+/* Improve register form styling */
+.register-form {
+  background: #f8f9fa;
+  border: 2px solid #28a745;
+  border-radius: 8px;
+  padding: 25px;
+  margin: 20px 0;
+  box-shadow: 0 4px 6px rgba(40, 167, 69, 0.1);
+}
+
+.register-form h3 {
+  color: #28a745;
+  margin-bottom: 20px;
+  font-size: 1.3em;
+  border-bottom: 2px solid #28a745;
+  padding-bottom: 10px;
+}
+
+.register-form input {
+  width: 100%;
+  padding: 12px 15px;
+  margin-bottom: 15px;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  font-size: 16px;
+  transition: border-color 0.3s ease;
+  box-sizing: border-box;
+}
+
+.register-form input:focus {
+  outline: none;
+  border-color: #28a745;
+  box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.1);
+}
+
+.register-form button[type="submit"] {
+  width: 100%;
+  padding: 12px;
+  background: #28a745;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 10px;
+}
+
+.register-form button[type="submit"]:hover {
+  background: #218838;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
+}
+
+/* Error and success message improvements */
+.error-message {
+  background: #f8d7da !important;
+  color: #721c24 !important;
+  border: 1px solid #f5c6cb !important;
+  padding: 12px 15px !important;
+  border-radius: 6px !important;
+  margin-bottom: 15px !important;
+  font-weight: 500 !important;
+}
+
+.success-message {
+  background: #d4edda !important;
+  color: #155724 !important;
+  border: 1px solid #c3e6cb !important;
+  padding: 15px !important;
+  border-radius: 6px !important;
+  margin-bottom: 20px !important;
+  text-align: center !important;
+  font-weight: 500 !important;
+  animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Responsive design */
 @media (max-width: 768px) {
   .admin-dashboard {
     padding: 0;

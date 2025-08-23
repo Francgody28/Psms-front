@@ -369,6 +369,11 @@ const AdminDashboard = ({ user, onLogout }) => {
     setEditError('');
   };
 
+  const formatRole = (role) => {
+    if (!role) return '';
+    return role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  };
+
   if (loading) {
     return <div className="dashboard-loading">Loading dashboard...</div>;
   }
@@ -563,6 +568,19 @@ const AdminDashboard = ({ user, onLogout }) => {
             <div key={userItem.id} className="user-item">
               <div className="user-info">
                 <span>{userItem.username} - {userItem.email}</span>
+                {userItem.role ? (
+                  <div style={{
+                    color:'#5499deff',
+                    borderRadius:6,
+                    padding:'2px 5px',
+                    fontSize:'0.85em',
+                    fontWeight:600
+                  }}>
+                    {formatRole(userItem.role)}
+                  </div>
+                ) : (
+                  <div style={{marginLeft:8, color:'#999', fontSize:'0.85em'}}>—</div>
+                )}
                 <span className={userItem.is_active ? 'active' : 'inactive'}>
                   {userItem.is_active ? 'Active' : 'Inactive'}
                 </span>

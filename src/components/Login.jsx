@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import './Login.css';
+import { api } from '../utils/api';
 
 const Login = ({ onLogin }) => {
   const [formData, setFormData] = useState({
@@ -49,13 +50,21 @@ const Login = ({ onLogin }) => {
       if (response.ok) {
         // Store token in localStorage
         localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
 
-        // Determine user role (admin if superuser/staff)
-        const userRole = data.user.is_admin ? 'admin' : 'user';
-
-        // Notify app (username, role, fullUser, dashboardUrl)
-        onLogin && onLogin(data.user.username, userRole, data.user, data.dashboard_url);
+        // fetch full profile (to get role) then store
+        try {
+          const profile = await api.getProfile();
+          localStorage.setItem('user', JSON.stringify(profile));
+          localStorage.setItem('role', profile.role || '');
+          const userRole = profile.role || (profile.is_admin ? 'admin' : 'user');
+          // Notify app with profile (username, role, fullUser, dashboardUrl)
+          onLogin && onLogin(profile.username, userRole, profile, data.dashboard_url);
+        } catch {
+          // fallback to server-provided user (if any)
+          localStorage.setItem('user', JSON.stringify(data.user || {}));
+          const userRole = data.user?.is_admin ? 'admin' : 'user';
+          onLogin && onLogin(data.user?.username || formData.username, userRole, data.user, data.dashboard_url);
+        }
       } else {
         setError(data.error || 'Login failed. Please check your credentials.');
       }

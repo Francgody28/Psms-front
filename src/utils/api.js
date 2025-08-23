@@ -219,6 +219,43 @@ export const api = {
     }
     return response.json();
   },
+
+  // fetch current user's profile (expects backend at /auth/profile/)
+  getProfile: async () => {
+    const response = await fetch(`${API_BASE_URL}/auth/profile/`, {
+      method: 'GET',
+      headers: getHeaders()
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response.json();
+  },
+
+  // approve endpoints (adjust backend urls if needed)
+  approvePlan: async (planId) => {
+    const response = await fetch(`${API_BASE_URL}/auth/plans/${planId}/approve/`, {
+      method: 'POST',
+      headers: getHeaders()
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(()=>({ error: 'Approve plan failed' }));
+      throw new Error(err.error || `HTTP error! status: ${response.status}`);
+    }
+    return response.json();
+  },
+
+  approveStatistic: async (statId) => {
+    const response = await fetch(`${API_BASE_URL}/auth/statistics/${statId}/approve/`, {
+      method: 'POST',
+      headers: getHeaders()
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(()=>({ error: 'Approve statistic failed' }));
+      throw new Error(err.error || `HTTP error! status: ${response.status}`);
+    }
+    return response.json();
+  }
 };
 
 export default api;

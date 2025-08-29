@@ -19,7 +19,7 @@
 }
 
 .dashboard-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #667eea 0%, #2b838d 100%);
   color: white;
   padding: 2rem 3rem;
   display: flex;
@@ -159,7 +159,7 @@
 }
 
 .register-btn {
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #667eea, #3ac7d1);
   color: white;
   border: none;
   padding: 1rem 2.5rem;
@@ -212,7 +212,7 @@
   text-align: center;
   font-size: 1.4rem;
   font-weight: 700;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #667eea, #44bddf);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -254,7 +254,7 @@
 
 .register-form button {
   width: 100%;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #667eea, #63c3d9);
   color: white;
   border: none;
   padding: 0.8rem;
@@ -329,7 +329,7 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
-  min-width: 120px;
+  min-width: 150px;
 }
 
 .form-buttons button[type="submit"] {

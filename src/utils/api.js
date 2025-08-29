@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:8000/api';
+const API_BASE_URL = 'http://localhost:2800/api';
 
 // Get token from localStorage
 const getToken = () => localStorage.getItem('token');
@@ -253,6 +253,34 @@ export const api = {
     if (!response.ok) {
       const err = await response.json().catch(()=>({ error: 'Approve statistic failed' }));
       throw new Error(err.error || `HTTP error! status: ${response.status}`);
+    }
+    return response.json();
+  },
+
+  uploadFile: async (file, extraData = {}) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    // Append any extra data if needed
+    Object.entries(extraData).forEach(([key, value]) => {
+      formData.append(key, value);
+    });
+
+    const token = getToken();
+    const response = await fetch(`${API_BASE_URL}/auth/upload/`, {
+      method: 'POST',
+      headers: token ? { 'Authorization': `Token ${token}` } : undefined,
+      body: formData
+    });
+
+    if (!response.ok) {
+      let errorMessage = `HTTP error! status: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorData.message || errorMessage;
+      } catch {
+        // Intentionally ignore JSON parse errors
+      }
+      throw new Error(errorMessage);
     }
     return response.json();
   }

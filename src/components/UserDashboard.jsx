@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { api } from '../utils/api';
 import './UserDashboard.css';
+import { useNavigate } from 'react-router-dom';
+import zafiriLogo from '../assets/zafiri.png';
 
 const SimpleUserDashboard = ({ user, onLogout }) => {
   const [dashboardData, setDashboardData] = useState(null);
@@ -14,6 +16,8 @@ const SimpleUserDashboard = ({ user, onLogout }) => {
 
   // derived role from profile state or props/localStorage fallback
   const role = profileState?.role || localStorage.getItem('role') || (user && user.role) || '';
+
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchDashboardData();
@@ -75,13 +79,12 @@ const SimpleUserDashboard = ({ user, onLogout }) => {
   };
 
   const handleAddStatistics = () => {
-    // TODO: Navigate to add statistics page or open modal
-    console.log('Add Statistics clicked');
+    navigate('/statistics-dashboard');
   };
 
   const handleAddPlan = () => {
-    // TODO: Navigate to add plan page or open modal
-    console.log('Add Plan clicked');
+    // Navigate to planning dashboard
+    navigate('/planning-dashboard');
   };
 
   // simple toast popup (auto-dismiss)
@@ -108,17 +111,6 @@ const SimpleUserDashboard = ({ user, onLogout }) => {
     );
   };
 
-  const handleApprovePlan = async (planId) => {
-    try {
-      const res = await api.approvePlan(planId);
-      setPopupMessage(res.message || 'Plan approved');
-      setPopupType('update');
-      fetchDashboardData();
-    } catch (err) {
-      setPopupMessage(err.message || 'Failed to approve plan');
-      setPopupType('delete');
-    }
-  };
 
   const handleApproveStatistic = async (statId) => {
     try {
@@ -132,126 +124,243 @@ const SimpleUserDashboard = ({ user, onLogout }) => {
     }
   };
 
+  const [plans, setPlans] = useState([]);
+  // Add state for modal view
+  const [viewPlan, setViewPlan] = useState(null);
+
+  // Fetch pending plans for approval if head_of_division or head_of_department
+  useEffect(() => {
+    if (role === 'head_of_division' || role === 'head_of_department') {
+      fetch('http://localhost:2800/api/auth/pending-plans/', {
+        headers: {
+          Authorization: `Token ${localStorage.getItem('token')}`,
+        },
+      })
+        .then(res => res.json())
+        .then(data => {
+          setPlans(Array.isArray(data) ? data.filter(p => p.file) : []);
+        });
+    }
+  }, [role, popupMessage]);
+
+  // Approve and reject handlers for modal
+  const handleApprovePlanModal = async (planId) => {
+    try {
+      const res = await api.approvePlan(planId);
+      setPopupMessage(res.message || 'Plan approved');
+      setPopupType('update');
+      setViewPlan(null);
+      fetchDashboardData();
+    } catch (err) {
+      setPopupMessage(err.message || 'Failed to approve plan');
+      setPopupType('delete');
+    }
+  };
+
+  const handleRejectPlanModal = async () => {
+    // Implement your reject logic here (e.g., call an API endpoint to reject)
+    setPopupMessage('Plan rejected (implement backend logic)');
+    setPopupType('delete');
+    setViewPlan(null);
+    fetchDashboardData();
+  };
+
   if (loading) {
     return <div className="dashboard-loading">Loading dashboard...</div>;
   }
 
   return (
     <div className="user-dashboard">
-      <header className="dashboard-header">
-        <h1>Welcome, {user.first_name || user.username}!</h1>
-        <button onClick={handleLogout} className="logout-btn">Logout</button>
-      </header>
-      
-      <div className="dashboard-content">
-        <div className="welcome-card">
-          <h2>Planning & Statistics Management System</h2>
-          <p>Welcome employee. Here you can manage your tasks, view statistics, and access planning tools.</p>
+      <div className="dashboard-sidebar">
+        <div className="sidebar-logo">
+          {/* Add Zafiri logo image */}
+          <img
+            src={zafiriLogo}
+            alt="Zafiri Logo"
+            style={{ width: 60, height: 60, objectFit: 'contain', marginBottom: 8 }}
+          />
+          <h2>PSMS</h2>
         </div>
+        <nav className="sidebar-nav">
+          <ul>
+            <li>Dashboard</li>
+            <li onClick={() => navigate('/statistics-dashboard')} style={{ cursor: 'pointer' }}>Statistics</li>
+            <li onClick={() => navigate('/planning-dashboard')} style={{ cursor: 'pointer' }}>Plans</li>
+            <li onClick={handleLogout} style={{ cursor: 'pointer', color: '#fff' }}>Logout</li>
+          </ul>
+        </nav>
+      </div>
+      <div className="dashboard-main">
+        <header className="dashboard-header">
+          <h1>Welcome, {user.first_name || user.username}!</h1>
+          <button onClick={handleLogout} className="logout-btn">Logout</button>
+        </header>
+        <div className="dashboard-content">
+          <div className="welcome-card">
+            <h2>Planning & Statistics Management System</h2>
+            <p>Welcome employee. Here you can manage your tasks, view statistics, and access planning tools.</p>
+          </div>
 
-        <div className="stats">
-          <div className="stat-card">
-            <h3>My Tasks</h3>
-            <p>{dashboardData?.my_tasks || 0}</p>
+          <div className="stats">
+            <div className="stat-card">
+              <h3>My Tasks</h3>
+              <p>{dashboardData?.my_tasks || 0}</p>
+            </div>
+            <div className="stat-card">
+              <h3>Completed</h3>
+              <p>{dashboardData?.completed_tasks || 0}</p>
+            </div>
+            <div className="stat-card">
+              <h3>Pending</h3>
+              <p>{dashboardData?.pending_tasks || 0}</p>
+            </div>
           </div>
-          <div className="stat-card">
-            <h3>Completed</h3>
-            <p>{dashboardData?.completed_tasks || 0}</p>
-          </div>
-          <div className="stat-card">
-            <h3>Pending</h3>
-            <p>{dashboardData?.pending_tasks || 0}</p>
-          </div>
-        </div>
 
-        <div className="quick-actions">
-          <div className="action-card" onClick={handleAddStatistics}>
-            <h4>Add Statistics</h4>
-            <p>Create and manage your statistical data</p>
+          <div className="quick-actions">
+            <div className="action-card" onClick={handleAddStatistics}>
+              <h4>Add Statistics</h4>
+              <p>Create and manage your statistical data</p>
+            </div>
+            <div className="action-card" onClick={handleAddPlan}>
+              <h4>Add Plan</h4>
+              <p>Create new planning schedules and goals</p>
+            </div>
+            <div className="action-card">
+              <h4>View Statistics</h4>
+              <p>Access your personal statistics and reports</p>
+            </div>
           </div>
-          <div className="action-card" onClick={handleAddPlan}>
-            <h4>Add Plan</h4>
-            <p>Create new planning schedules and goals</p>
-          </div>
-          <div className="action-card">
-            <h4>View Statistics</h4>
-            <p>Access your personal statistics and reports</p>
-          </div>
-          <div className="action-card">
-            <h4>Create Task</h4>
-            <p>Add new tasks to your planning schedule</p>
-          </div>
-          <div className="action-card">
-            <h4>Reports</h4>
-            <p>Generate and view your progress reports</p>
-          </div>
-        </div>
 
-        <div className="recent-activity">
-          <h3>Recent Activity</h3>
-          {dashboardData?.recent_activities?.length > 0 ? (
-            dashboardData.recent_activities.map((activity, index) => (
-              <div key={index} className="activity-item">
-                <div className="activity-info">
-                  <div className="activity-title">{activity.title}</div>
-                  <div className="activity-date">{activity.date}</div>
+          <div className="recent-activity">
+            <h3>Recent Activity</h3>
+            {dashboardData?.recent_activities?.length > 0 ? (
+              dashboardData.recent_activities.map((activity, index) => (
+                <div key={index} className="activity-item">
+                  <div className="activity-info">
+                    <div className="activity-title">{activity.title}</div>
+                    <div className="activity-date">{activity.date}</div>
+                  </div>
+                  <span className={`activity-status ${activity.status}`}>
+                    {activity.status}
+                  </span>
                 </div>
-                <span className={`activity-status ${activity.status}`}>
-                  {activity.status}
-                </span>
-              </div>
-            ))
-          ) : (
-            <p>No recent activity to display.</p>
-          )}
-        </div>
-
-        {/* approvals panel shown only for head_of_department or head_of_division */}
-        {(role === 'head_of_department' || role === 'head_of_division') ? (
-          <div className="approvals-section" style={{ marginTop: 20 }}>
-            <h3 style={{ marginBottom: 10 }}>Approvals</h3>
-            {/* quick info when no plans/statistics exist */}
-            {(!dashboardData?.plans || dashboardData.plans.length === 0) && (!dashboardData?.statistics || dashboardData.statistics.length === 0) && (
-              <div style={{ color: '#666', marginBottom: 8 }}>No plans or statistics available for approval.</div>
+              ))
+            ) : (
+              <p>No recent activity to display.</p>
             )}
-
-            {/* Plans to approve (backend should supply dashboardData.plans) */}
-            <div style={{ marginBottom: 12 }}>
-              <h4 style={{ marginBottom: 8 }}>Plans</h4>
-              {dashboardData?.plans?.length ? dashboardData.plans.map(p => (
-                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                  <div style={{ flex: 1 }}>{p.title}</div>
-                  <button onClick={() => handleApprovePlan(p.id)} style={{
-                    background: '#28a745', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer'
-                  }}>
-                    Approve
-                  </button>
-                </div>
-              )) : <div style={{ color: '#666' }}>No plans to approve</div>}
-            </div>
-
-            {/* Statistics to approve (backend should supply dashboardData.statistics) */}
-            <div>
-              <h4 style={{ marginBottom: 8 }}>Statistics</h4>
-              {dashboardData?.statistics?.length ? dashboardData.statistics.map(s => (
-                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                  <div style={{ flex: 1 }}>{s.title}</div>
-                  <button onClick={() => handleApproveStatistic(s.id)} style={{
-                    background: '#28a745', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer'
-                  }}>
-                    Approve
-                  </button>
-                </div>
-              )) : <div style={{ color: '#666' }}>No statistics to approve</div>}
-            </div>
           </div>
-        ) : (
-          <div style={{ marginTop: 20, color: '#666' }}>
-            Approvals are available only for Heads of Division / Department.
-          </div>
-        )}
 
-        {popupMessage && <Popup message={popupMessage} type={popupType} onClose={() => setPopupMessage('')} />}
+          {/* approvals panel shown only for head_of_department or head_of_division */}
+          {(role === 'head_of_department' || role === 'head_of_division') ? (
+            <div className="approvals-section" style={{ marginTop: 20 }}>
+              <h3 style={{ marginBottom: 10 }}>Approvals</h3>
+              {/* quick info when no plans/statistics exist */}
+              {((!plans || plans.length === 0) && (!dashboardData?.statistics || dashboardData.statistics.length === 0)) && (
+                <div style={{ color: '#666', marginBottom: 8 }}>No plans or statistics available for approval.</div>
+              )}
+
+              {/* Plans to approve (fetched from backend) */}
+              <div style={{ marginBottom: 12 }}>
+                <h4 style={{ marginBottom: 8 }}>Plans</h4>
+                {plans && plans.length ? plans.map(p => (
+                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                    <div style={{ flex: 1 }}>
+                      {p.file.split('/').pop()} (by {p.uploader_name})
+                    </div>
+                    <button
+                      style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
+                      onClick={() => setViewPlan(p)}
+                    >
+                      View
+                    </button>
+                  </div>
+                )) : <div style={{ color: '#666' }}>No plans to approve</div>}
+              </div>
+
+              {/* Statistics to approve (backend should supply dashboardData.statistics) */}
+              <div>
+                <h4 style={{ marginBottom: 8 }}>Statistics</h4>
+                {dashboardData?.statistics?.length ? dashboardData.statistics.map(s => (
+                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                    <div style={{ flex: 1 }}>{s.title}</div>
+                    <button onClick={() => handleApproveStatistic(s.id)} style={{
+                      background: '#28a745', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer'
+                    }}>
+                      Approve
+                    </button>
+                  </div>
+                )) : <div style={{ color: '#666' }}>No statistics to approve</div>}
+              </div>
+              {/* Modal for plan view/approve/reject */}
+              {viewPlan && (
+                <div style={{
+                  position: 'fixed',
+                  top: 0, left: 0, right: 0, bottom: 0,
+                  background: 'rgba(0,0,0,0.35)',
+                  zIndex: 9999,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <div style={{
+                    background: '#fff',
+                    borderRadius: 12,
+                    padding: 32,
+                    minWidth: '60vw',
+                    maxWidth: '60vw',
+                    minHeight: '60vh',
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+                    position: 'relative',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between'
+                  }}>
+                    <h3 style={{ marginTop: 0, marginBottom: 18 }}>
+                      {viewPlan.file.split('/').pop()} (by {viewPlan.uploader_name})
+                    </h3>
+                    <iframe
+                      src={`http://localhost:2800/media/${viewPlan.file}`}
+                      title="Plan Document"
+                      style={{
+                        width: '100%',
+                        height: '50vh',
+                        border: 'none',
+                        marginBottom: 16,
+                        background: '#f8f9fc'
+                      }}
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                      <button
+                        style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 6, fontWeight: 600, fontSize: '1rem', cursor: 'pointer' }}
+                        onClick={() => handleApprovePlanModal(viewPlan.id)}
+                      >
+                        Approve
+                      </button>
+                      <button
+                        style={{ background: '#dc3545', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 6, fontWeight: 600, fontSize: '1rem', cursor: 'pointer' }}
+                        onClick={() => handleRejectPlanModal(viewPlan.id)}
+                      >
+                        Reject
+                      </button>
+                      <button
+                        style={{ background: '#888', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 6, fontWeight: 600, fontSize: '1rem', cursor: 'pointer' }}
+                        onClick={() => setViewPlan(null)}
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{ marginTop: 20, color: '#666' }}>
+              Approvals are available only for Heads of Division / Department.
+            </div>
+          )}
+
+          {popupMessage && <Popup message={popupMessage} type={popupType} onClose={() => setPopupMessage('')} />}
+        </div>
       </div>
     </div>
   );

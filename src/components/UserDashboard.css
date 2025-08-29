@@ -32,7 +32,7 @@
 
 /* Header Section */
 .dashboard-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #667eea 0%, #307b85 100%);
   color: white;
   padding: 2rem 3rem;
   display: flex;
@@ -137,7 +137,7 @@
   margin: 0 0 1.5rem 0;
   font-size: 2rem;
   font-weight: 800;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #667eea, #4b8fa2);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -315,6 +315,65 @@
   height: 3px;
   background: linear-gradient(90deg, #667eea, #764ba2);
 }
+/* Layout container */
+.user-dashboard {
+  display: flex;
+  min-height: 100vh;
+  background: #f8f9fc;
+}
+
+/* Sidebar styling */
+.dashboard-sidebar {
+  width: 235px;
+  background: #64bed7; /* dark navy */
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 0;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+}
+
+.sidebar-logo {
+  text-align: center;
+  font-size: 1.4rem;
+  font-weight: bold;
+  margin-bottom: 30px;
+}
+
+.sidebar-nav ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sidebar-nav li {
+  padding: 12px 20px;
+  cursor: pointer;
+  color: #0c0e10;
+  transition: background 0.3s, color 0.3s;
+}
+
+.sidebar-nav li:hover {
+  background: #334155;
+  color: #fff;
+}
+
+.sidebar-nav li.active {
+  background: #2563eb;
+  color: #fff;
+}
+
+/* Main content should push right of sidebar */
+.dashboard-main {
+  flex: 1;
+  margin-left: 220px; /* same width as sidebar */
+  padding: 20px;
+}
+
 
 .activity-item {
   display: flex;

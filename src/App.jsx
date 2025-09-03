@@ -3,8 +3,10 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Login from './components/Login'
 import SimpleUserDashboard from './components/UserDashboard'
 import AdminDashboard from './components/AdminDashboard'
-import PlanningDashboard from './components/Planning'
-import StatisticsDashboard from './components/StatisticsDashboard';
+import PlanningDashboard from './components/PlanningOfficer'
+import StatisticsDashboard from './components/StatisticsDashboard'
+import HeadOfDivisionDashboard from './components/HeadOfDivisionDashboard'
+import HeadOfDepartmentDashboard from './components/HeadOfDepartmentDashboard'
 import './App.css'
 
 function App() {
@@ -34,6 +36,24 @@ function App() {
     localStorage.removeItem('token')
   }
 
+  // Helper function to get dashboard route based on role
+  const getDashboardRoute = (role) => {
+    switch (role) {
+      case 'admin':
+        return '/admin-dashboard'
+      case 'head_of_division':
+        return '/head-of-division-dashboard'
+      case 'head_of_department':
+        return '/head-of-department-dashboard'
+      case 'planning_officer':
+        return '/planning-dashboard'
+      case 'statistics_officer':
+        return '/statistics-dashboard'
+      default:
+        return '/dashboard'
+    }
+  }
+
   return (
     <BrowserRouter>
       <Routes>
@@ -41,11 +61,7 @@ function App() {
           path="/"
           element={
             isAuthenticated ? (
-              userRole === 'admin' ? (
-                <Navigate to="/admin" replace />
-              ) : (
-                <Navigate to="/dashboard" replace />
-              )
+              <Navigate to={getDashboardRoute(userRole)} replace />
             ) : (
               <Navigate to="/login" replace />
             )
@@ -55,21 +71,69 @@ function App() {
           path="/login"
           element={
             isAuthenticated ? (
-              userRole === 'admin' ? (
-                <Navigate to="/admin" replace />
-              ) : (
-                <Navigate to="/dashboard" replace />
-              )
+              <Navigate to={getDashboardRoute(userRole)} replace />
             ) : (
               <Login onLogin={handleLogin} />
             )
           }
         />
         <Route
-          path="/admin"
+          path="/admin-dashboard"
           element={
             isAuthenticated && userRole === 'admin' ? (
               <AdminDashboard 
+                user={userData || { username: user }}
+                onLogout={handleLogout}
+              />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/head-of-division-dashboard"
+          element={
+            isAuthenticated && userRole === 'head_of_division' ? (
+              <HeadOfDivisionDashboard 
+                user={userData || { username: user }}
+                onLogout={handleLogout}
+              />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/head-of-department-dashboard"
+          element={
+            isAuthenticated && userRole === 'head_of_department' ? (
+              <HeadOfDepartmentDashboard 
+                user={userData || { username: user }}
+                onLogout={handleLogout}
+              />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/planning-dashboard"
+          element={
+            isAuthenticated && (userRole === 'planning_officer' || userRole === 'head_of_department' || userRole === 'head_of_division') ? (
+              <PlanningDashboard 
+                user={userData || { username: user }}
+                onLogout={handleLogout}
+              />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/statistics-dashboard"
+          element={
+            isAuthenticated && (userRole === 'statistics_officer' || userRole === 'head_of_department' || userRole === 'head_of_division') ? (
+              <StatisticsDashboard
                 user={userData || { username: user }}
                 onLogout={handleLogout}
               />
@@ -83,32 +147,6 @@ function App() {
           element={
             isAuthenticated && userRole === 'user' ? (
               <SimpleUserDashboard 
-                user={userData || { username: user }}
-                onLogout={handleLogout}
-              />
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        />
-        <Route
-          path="/planning-dashboard"
-          element={
-            isAuthenticated && userRole === 'user' ? (
-              <PlanningDashboard 
-                user={userData || { username: user }}
-                onLogout={handleLogout}
-              />
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        />
-        <Route
-          path="/statistics-dashboard"
-          element={
-            isAuthenticated && userRole === 'user' ? (
-              <StatisticsDashboard
                 user={userData || { username: user }}
                 onLogout={handleLogout}
               />

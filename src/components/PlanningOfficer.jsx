@@ -1,6 +1,7 @@
 import './UserDashboard.css';
 import { useNavigate } from 'react-router-dom';
 import { useRef, useState, useEffect } from 'react';
+import zafiriLogo from '../assets/zafiri.png';
 
 const PlanningDashboard = ({ user, onLogout }) => {
   const navigate = useNavigate();
@@ -10,6 +11,8 @@ const PlanningDashboard = ({ user, onLogout }) => {
   const [textPreview, setTextPreview] = useState('');
   const [textLoaded, setTextLoaded] = useState(false);
   const [pendingPlans, setPendingPlans] = useState([]);
+  const [recentActivities, setRecentActivities] = useState([]);
+  const [refreshKey, setRefreshKey] = useState(0); // Add refresh key
 
   // Example static values; replace with real data as needed
   const receivedBudget = 100000000;
@@ -28,6 +31,74 @@ const PlanningDashboard = ({ user, onLogout }) => {
         .then(data => setPendingPlans(data));
     }
   }, [user]);
+
+  // Fetch recent activities (uploaded plans by this user)
+  useEffect(() => {
+    const fetchRecentActivities = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        console.log('Fetching recent activities with token:', token ? 'Present' : 'Missing');
+        console.log('Current user:', user);
+        
+        const res = await fetch('http://localhost:2800/api/auth/my-plans/', {
+          headers: {
+            Authorization: `Token ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        console.log('Response status:', res.status);
+        console.log('Response ok:', res.ok);
+        console.log('Response headers:', Object.fromEntries(res.headers.entries()));
+        
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error('Response not OK:', res.status, res.statusText);
+          console.error('Error response body:', errorText);
+          
+          // Try to parse as JSON if possible
+          try {
+            const errorJson = JSON.parse(errorText);
+            console.error('Parsed error:', errorJson);
+          } catch {
+            console.error('Could not parse error as JSON');
+          }
+          
+          setRecentActivities([]);
+          return;
+        }
+        
+        const data = await res.json();
+        console.log('Fetched activities data:', data);
+        
+        // Map to activity format
+        if (Array.isArray(data)) {
+          const mappedActivities = data
+            .sort((a, b) => new Date(b.uploaded_at || b.created_at) - new Date(a.uploaded_at || a.created_at))  // Changed to use uploaded_at first
+            .slice(0, 10)
+            .map(plan => ({
+              title: plan.file ? plan.file.split('/').pop() : 'Plan',
+              date: plan.uploaded_at || plan.created_at || '',  // Changed to use uploaded_at first
+              status: plan.status || 'pending',
+            }));
+          
+          console.log('Mapped activities:', mappedActivities);
+          setRecentActivities(mappedActivities);
+        } else {
+          console.error('Data is not an array:', data);
+          setRecentActivities([]);
+        }
+      } catch (error) {
+        console.error('Error fetching recent activities:', error);
+        console.error('Error stack:', error.stack);
+        setRecentActivities([]);
+      }
+    };
+    
+    if (user) {
+      fetchRecentActivities();
+    }
+  }, [user, refreshKey]); // Add refreshKey to dependencies
 
   const handleLogout = async () => {
     localStorage.removeItem('token');
@@ -65,7 +136,6 @@ const PlanningDashboard = ({ user, onLogout }) => {
 
     try {
       const token = localStorage.getItem('token');
-      // Use the full backend URL with your backend port (2800)
       const apiUrl = 'http://localhost:2800/api/auth/upload-plan/';
       const res = await fetch(apiUrl, {
         method: 'POST',
@@ -74,6 +144,7 @@ const PlanningDashboard = ({ user, onLogout }) => {
         },
         body: formData,
       });
+      
       if (!res.ok) {
         let errMsg = '';
         try {
@@ -83,44 +154,26 @@ const PlanningDashboard = ({ user, onLogout }) => {
           errMsg = res.statusText || 'Unknown error';
         }
         alert('Upload failed: ' + errMsg);
-      } else {
-        alert('File uploaded successfully!');
+        return;
       }
+      
+      const uploadResult = await res.json();
+      console.log('Upload result:', uploadResult);
+      alert('File uploaded successfully!');
+      
+      // Trigger refresh of activities
+      setRefreshKey(prev => prev + 1);
+      
     } catch (e) {
+      console.error('Upload error:', e);
       alert('Upload error: ' + e.message);
     }
     setSelectedFile(null);
     setShowPreview(false);
   };
 
-  // Approve plan handler
-  const handleApprovePlan = async (planId) => {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:2800/api/auth/review-plan/${planId}/`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Token ${token}`,
-        },
-      });
-      if (!res.ok) {
-        let errMsg = '';
-        try {
-          const err = await res.json();
-          errMsg = err.error || res.statusText;
-        } catch {
-          errMsg = res.statusText || 'Unknown error';
-        }
-        alert('Approve failed: ' + errMsg);
-      } else {
-        alert('Plan approved!');
-        // Refresh pending plans
-        setPendingPlans(pendingPlans.filter(plan => plan.id !== planId));
-      }
-    } catch (e) {
-      alert('Approve error: ' + e.message);
-    }
-  };
+  // Approve plan handler (now handles both approve and reject)
+  // (Removed unused handleApprovePlan function to fix unused variable error)
 
   // Button styles
   const blueBtn = {
@@ -265,6 +318,11 @@ const PlanningDashboard = ({ user, onLogout }) => {
     <div className="user-dashboard">
       <div className="dashboard-sidebar">
         <div className="sidebar-logo">
+          <img
+            src={zafiriLogo}
+            alt="Zafiri Logo"
+            style={{ width: 60, height: 60, objectFit: 'contain', marginBottom: 8 }}
+          />
           <h2>PSMS</h2>
         </div>
         <nav className="sidebar-nav">
@@ -370,6 +428,66 @@ const PlanningDashboard = ({ user, onLogout }) => {
               </div>
             )}
           </div>
+          {/* Recent Activity Section */}
+          <div className="recent-activity" style={{ marginTop: '2rem' }}>
+            <h3>Recent Activity</h3>
+            {recentActivities.length > 0 ? (
+              <div style={{ 
+                background: '#fff', 
+                borderRadius: '8px', 
+                padding: '1rem',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)' 
+              }}>
+                {recentActivities.map((activity, idx) => {
+                  // Map status for display
+                  let displayStatus = activity.status;
+                  if (activity.status === 'reviewed') {
+                    displayStatus = 'approved';
+                  }
+                  
+                  // Determine color based on displayStatus
+                  let statusColor = '#6b7280'; // default gray
+                  if (displayStatus === 'pending') statusColor = '#f59e0b'; // yellow
+                  else if (displayStatus === 'approved') statusColor = '#10b981'; // green
+                  else if (displayStatus === 'rejected') statusColor = '#ef4444'; // red
+                  
+                  return (
+                    <div 
+                      key={idx} 
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '0.75rem 0',
+                        borderBottom: idx < recentActivities.length - 1 ? '1px solid #e5e7eb' : 'none'
+                      }}
+                    >
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: '500', color: '#1f2937', marginBottom: '0.25rem' }}>
+                          {activity.title}
+                        </div>
+                        <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                          {activity.date ? new Date(activity.date).toLocaleString() : ''}
+                        </div>
+                      </div>
+                      <span 
+                        style={{ 
+                          color: statusColor, 
+                          fontWeight: 'bold',
+                          fontSize: '0.875rem',
+                          textTransform: 'capitalize'
+                        }}
+                      >
+                        {displayStatus}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p>No recent activity to display.</p>
+            )}
+          </div>
           {/* Pending Plans Section (for head of division) */}
           {user && user.role === 'head_of_division' && (
             <div style={{ marginTop: 32 }}>
@@ -379,21 +497,23 @@ const PlanningDashboard = ({ user, onLogout }) => {
               ) : (
                 <ul>
                   {pendingPlans.map(plan => (
-                    <li key={plan.id} style={{ marginBottom: 12 }}>
-                      <span>{plan.file.split('/').pop()} (by {plan.uploader_name})</span>
-                      <button
-                        style={{ ...blueBtn, marginLeft: 16 }}
-                        onClick={() => window.open(`http://localhost:2800/media/${plan.file}`, '_blank')}
-                      >
-                        View
-                      </button>
-                      <button
-                        style={{ ...blueBtn, background: '#28a745', marginLeft: 8 }}
-                        onClick={() => handleApprovePlan(plan.id)}
-                      >
-                        Approve
-                      </button>
-                    </li>
+                    <li key={plan.id} style={{ marginBottom: 12, display: 'flex', alignItems: 'center' }}>
+                      <span style={{ flex: 1 }}>
+                        {plan.file.split('/').pop()} (by {plan.uploader_name})
+                      </span>
+                    <span 
+                      style={{
+                        marginRight: 12,
+                        fontWeight: 'bold',
+                        color: (plan.status || 'pending') === 'pending' ? '#f59e0b'
+                          : plan.status === 'approved' ? '#10b981'
+                          : plan.status === 'rejected' ? '#ef4444'
+                          : '#6b7280'
+                      }}
+                    >
+                      {plan.status || 'pending'}
+                    </span>
+                  </li>
                   ))}
                 </ul>
               )}

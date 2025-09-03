@@ -6,11 +6,11 @@
 }
 
 .user-dashboard {
-  position: absolute;
+  position: relative;
   top: 0;
   left: 0;
   min-height: 100vh;
-  width: 100vw;
+  width: 100%;
   display: flex;
   flex-direction: column;
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
@@ -96,8 +96,8 @@
   display: flex;
   flex-direction: column;
   gap: 3rem;
-  width: 100vw;
-  max-width: 100vw;
+  width: 100%;
+  max-width: 100%;
   box-sizing: border-box;
   margin: 0;
   position: relative;
@@ -315,6 +315,7 @@
   height: 3px;
   background: linear-gradient(90deg, #667eea, #764ba2);
 }
+
 /* Layout container */
 .user-dashboard {
   display: flex;
@@ -370,82 +371,70 @@
 /* Main content should push right of sidebar */
 .dashboard-main {
   flex: 1;
-  margin-left: 220px; /* same width as sidebar */
+  margin-left: 235px; /* match sidebar width */
   padding: 20px;
+} /* FIX: close block so following rules are not swallowed */
+
+/* Ensure content doesn't force viewport width and overflow */
+.dashboard-content {
+  width: 100%;
+  max-width: 100%;
 }
 
-
-.activity-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem 0;
-  border-bottom: 1px solid #e2e8f0;
-  transition: all 0.3s ease;
-  border-radius: 10px;
-  margin: 0 -1rem;
-  padding-left: 1rem;
-  padding-right: 1rem;
+/* Make the root container not force absolute 100vw behavior */
+.user-dashboard {
+  position: relative;
+  width: 100%;
+  overflow-x: hidden;
 }
 
-.activity-item:hover {
-  background: rgba(102, 126, 234, 0.05);
-  transform: translateX(10px);
-  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.1);
+/* Tablet: shrink sidebar and shift main */
+@media (max-width: 1024px) {
+  .dashboard-sidebar {
+    width: 200px;
+  }
+  .dashboard-main {
+    margin-left: 200px;
+  }
 }
 
-.activity-item:last-child {
-  border-bottom: none;
+/* Mobile: stack sidebar on top and remove left offset */
+@media (max-width: 768px) {
+  .dashboard-sidebar {
+    position: static;
+    width: 100%;
+    height: auto;
+  }
+  .dashboard-main {
+    margin-left: 0;
+    padding: 16px;
+  }
+  .dashboard-content {
+    width: 100%;
+    max-width: 100%;
+    padding: 1.5rem;
+    gap: 2rem;
+  }
 }
 
-.activity-info {
-  flex: 1;
+/* Status badge colors (keep as-is, shown for context)
+.activity-status.pending { background-color: #ffc107; color: #212529; }
+.activity-status.reviewed { background-color: #28a745; }
+.activity-status.rejected { background-color: #dc3545; }
+*/
+
+/* NOTE: Remove stray duplicate blocks and unmatched braces near the end of the file:
+   - Delete the extra standalone ".stats { ... }" and ".quick-actions { ... }" after the 1920px media query.
+   - Remove the extra closing "}" that has no opening pair.
+*/
+
+
+.activity-status.reviewed {
+  background-color: #28a745; /* Green for approved/reviewed */
 }
 
-.activity-title {
-  font-weight: 700;
-  color: #2d3748;
-  margin-bottom: 0.5rem;
-  font-size: 1.1rem;
-}
-
-.activity-date {
-  font-size: 0.9rem;
-  color: #a0aec0;
-  font-style: italic;
-}
-
-.activity-status {
-  padding: 0.6rem 1.2rem;
-  border-radius: 20px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  transition: all 0.3s ease;
-}
-
-.activity-status:hover {
-  transform: scale(1.1);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-}
-
-.activity-status.completed {
-  background: linear-gradient(135deg, #48bb78, #38a169);
-  color: white;
-  box-shadow: 0 4px 15px rgba(72, 187, 120, 0.4);
-}
-
-.activity-status.pending {
-  background: linear-gradient(135deg, #ed8936, #dd6b20);
-  color: white;
-  box-shadow: 0 4px 15px rgba(237, 137, 54, 0.4);
-}
-
-.activity-status.in-progress {
-  background: linear-gradient(135deg, #4299e1, #3182ce);
-  color: white;
-  box-shadow: 0 4px 15px rgba(66, 153, 225, 0.4);
+.activity-status.rejected {
+  background-color: #dc3545; /* Red for rejected */
 }
 
 /* Responsive Design */
@@ -555,3 +544,12 @@
     gap: 3rem;
   }
 }
+  .stats {
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 3rem;
+  }
+  
+  .quick-actions {
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 3rem;
+  }

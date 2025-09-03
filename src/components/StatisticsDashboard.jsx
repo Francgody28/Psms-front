@@ -13,6 +13,10 @@ const StatisticsDashboard = ({ user, onLogout }) => {
   const stored = JSON.parse(localStorage.getItem('user') || 'null');
   const [profileState, setProfileState] = useState(stored);
 
+  // Add upload + my stats state
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [myStats, setMyStats] = useState([]);
+  const fileInputId = 'stat-upload-input';
 
   const navigate = useNavigate();
 
@@ -31,7 +35,24 @@ const StatisticsDashboard = ({ user, onLogout }) => {
       })();
     }
     // eslint-disable-next-line
-  }, [profileState]);
+  }, [profileState, refreshKey]);
+
+  // Fetch my statistics (for pending on statistics officer)
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch('http://localhost:2800/api/auth/my-statistics/', {
+          headers: { Authorization: `Token ${localStorage.getItem('token')}` },
+        });
+        if (!res.ok) throw new Error('Failed to load my statistics');
+        const data = await res.json();
+        setMyStats(Array.isArray(data) ? data : []);
+      } catch {
+        setMyStats([]);
+      }
+    };
+    load();
+  }, [refreshKey]);
 
   const fetchDashboardData = async () => {
     try {
@@ -63,6 +84,33 @@ const StatisticsDashboard = ({ user, onLogout }) => {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       onLogout();
+    }
+  };
+
+  const handleUploadClick = () => {
+    const input = document.getElementById(fileInputId);
+    if (input) input.click();
+  };
+
+  const handleFileChange = async (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    try {
+      const fd = new FormData();
+      fd.append('file', f);
+      const res = await fetch('http://localhost:2800/api/auth/upload-statistic/', {
+        method: 'POST',
+        headers: { Authorization: `Token ${localStorage.getItem('token')}` },
+        body: fd,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      setPopupMessage('Data uploaded successfully');
+      setRefreshKey(k => k + 1);
+    } catch (err) {
+      setPopupMessage(err.message || 'Upload failed');
+    } finally {
+      e.target.value = '';
     }
   };
 
@@ -206,9 +254,16 @@ const StatisticsDashboard = ({ user, onLogout }) => {
                 <h4>Create Statistics</h4>
                 <p>Create and manage your statistical data</p>
               </div>
-              <div className="action-card">
+              <div className="action-card" onClick={handleUploadClick} style={{ cursor: 'pointer' }}>
                 <h4>Upload Data</h4>
                 <p>Upload statistical datasets and reports</p>
+                <input
+                  id={fileInputId}
+                  type="file"
+                  accept=".xlsx,.xls,.doc,.docx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  onChange={handleFileChange}
+                  style={{ display: 'none' }}
+                />
               </div>
               <div className="action-card">
                 <h4>Generate Reports</h4>
@@ -233,6 +288,28 @@ const StatisticsDashboard = ({ user, onLogout }) => {
               ) : (
                 <p>No recent statistical activity to display.</p>
               )}
+            </div>
+
+            {/* My Data (pending/reviewed/approved/rejected) */}
+            <div className="recent-activity">
+              <h3>My Data</h3>
+              {myStats.length ? myStats.map((s, idx) => {
+                const status = s.status || 'pending';
+                let color = '#6b7280';
+                if (status === 'pending') color = '#f59e0b';
+                else if (status === 'reviewed') color = '#2563eb';
+                else if (status === 'approved') color = '#10b981';
+                else if (status === 'rejected') color = '#ef4444';
+                return (
+                  <div key={s.id || idx} className="activity-item">
+                    <div className="activity-info">
+                      <div className="activity-title">{s.file ? s.file.split('/').pop() : 'Data'}</div>
+                      <div className="activity-date">{s.uploaded_at ? new Date(s.uploaded_at).toLocaleString() : ''}</div>
+                    </div>
+                    <span style={{ color, fontWeight: 700, textTransform: 'capitalize' }}>{status}</span>
+                  </div>
+                );
+              }) : <p>No uploads yet.</p>}
             </div>
 
             {popupMessage && <Popup message={popupMessage} type={popupType} onClose={() => setPopupMessage('')} />}

@@ -11,12 +11,27 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
   const [popupType, setPopupType] = useState('update');
   const [plans, setPlans] = useState([]);
   const [viewPlan, setViewPlan] = useState(null);
+  // Statistics approvals
+  const [stats, setStats] = useState([]);
+  const [viewStat, setViewStat] = useState(null);
 
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchDashboardData();
     fetchPendingPlans();
+    // fetch statistics pending for HoDept (reviewed)
+    (async () => {
+      try {
+        const res = await fetch('http://localhost:2800/api/auth/pending-statistics/', {
+          headers: { Authorization: `Token ${localStorage.getItem('token')}` },
+        });
+        const data = await res.json();
+        setStats(Array.isArray(data) ? data.filter(s => s.file) : []);
+      } catch {
+        setStats([]);
+      }
+    })();
   }, [popupMessage]);
 
   const fetchDashboardData = async () => {
@@ -88,17 +103,6 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
     );
   };
 
-  const handleApproveStatistic = async (statId) => {
-    try {
-      const res = await api.approveStatistic(statId);
-      setPopupMessage(res.message || 'Statistic approved');
-      setPopupType('update');
-      fetchDashboardData();
-    } catch (err) {
-      setPopupMessage(err.message || 'Failed to approve statistic');
-      setPopupType('delete');
-    }
-  };
 
   const handleApprovePlanModal = async (planId) => {
     try {
@@ -142,6 +146,71 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
       fetchPendingPlans();
     } catch (err) {
       setPopupMessage(err.message || 'Failed to reject plan');
+      setPopupType('delete');
+    }
+  };
+
+  const handleApproveStatisticModal = async (statId) => {
+    try {
+      const res = await fetch(`http://localhost:2800/api/auth/review-statistic/${statId}/`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Token ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'approve' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to approve statistic');
+      setPopupMessage(data.message || 'Statistic approved');
+      setPopupType('update');
+      setViewStat(null);
+      fetchDashboardData();
+      // refresh stats list
+      (async () => {
+        try {
+          const r2 = await fetch('http://localhost:2800/api/auth/pending-statistics/', {
+            headers: { Authorization: `Token ${localStorage.getItem('token')}` },
+          });
+          setStats(Array.isArray(await r2.json()) ? (await r2.json()) : []);
+        } catch {
+          // Error intentionally ignored
+        }
+      })();
+    } catch (err) {
+      setPopupMessage(err.message || 'Failed to approve statistic');
+      setPopupType('delete');
+    }
+  };
+
+  const handleRejectStatisticModal = async (statId) => {
+    try {
+      const res = await fetch(`http://localhost:2800/api/auth/review-statistic/${statId}/`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Token ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'reject' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to reject statistic');
+      setPopupMessage(data.message || 'Statistic rejected');
+      setPopupType('delete');
+      setViewStat(null);
+      // refresh stats list
+      (async () => {
+        try {
+          const r2 = await fetch('http://localhost:2800/api/auth/pending-statistics/', {
+            headers: { Authorization: `Token ${localStorage.getItem('token')}` },
+          });
+          setStats(Array.isArray(await r2.json()) ? (await r2.json()) : []);
+        } catch {
+          // Error intentionally ignored
+        }
+      })();
+    } catch (err) {
+      setPopupMessage(err.message || 'Failed to reject statistic');
       setPopupType('delete');
     }
   };
@@ -273,17 +342,30 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
             {/* Statistics to approve */}
             <div>
               <h4 style={{ marginBottom: 8 }}>Statistics</h4>
-              {dashboardData?.statistics?.length ? dashboardData.statistics.map(s => (
-                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                  <div style={{ flex: 1 }}>{s.title}</div>
-                  <button onClick={() => handleApproveStatistic(s.id)} style={{
-                    background: '#28a745', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer'
-                  }}>
-                    Approve
-                  </button>
-                </div>
-              )) : <div style={{ color: '#666' }}>No statistics to approve</div>}
+              {stats && stats.length ? stats.map(s => {
+                const status = s.status || 'pending';
+                const statusColor = status === 'rejected' ? '#ef4444'
+                  : status === 'approved' ? '#10b981'
+                  : status === 'reviewed' ? '#2563eb'
+                  : '#f59e0b';
+                const viewBg = status === 'rejected' ? '#dc3545'
+                  : status === 'approved' ? '#28a745'
+                  : '#2563eb';
+                return (
+                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                    <div style={{ flex: 1 }}>{s.file.split('/').pop()} (by {s.uploader_name})</div>
+                    <span><span style={{ color: statusColor, fontWeight: 700, textTransform: 'capitalize' }}>{status}</span></span>
+                    <button
+                      style={{ background: viewBg, color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
+                      onClick={() => setViewStat(s)}
+                    >
+                      View
+                    </button>
+                  </div>
+                );
+              }) : <div style={{ color: '#666' }}>No statistics to approve</div>}
             </div>
+
             {/* Modal for plan view/approve/reject */}
             {viewPlan && (
               <div style={{
@@ -338,6 +420,62 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
                     <button
                       style={{ background: '#888', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 6, fontWeight: 600, fontSize: '1rem', cursor: 'pointer' }}
                       onClick={() => setViewPlan(null)}
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Modal for statistic view/approve/reject */}
+            {viewStat && (
+              <div style={{
+                position: 'fixed',
+                top: 0, left: 0, right: 0, bottom: 0,
+                background: 'rgba(0,0,0,0.35)',
+                zIndex: 9999,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <div style={{
+                  background: '#fff',
+                  borderRadius: 12,
+                  padding: 32,
+                  minWidth: '60vw',
+                  maxWidth: '60vw',
+                  minHeight: '60vh',
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+                  position: 'relative',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between'
+                }}>
+                  <h3 style={{ marginTop: 0, marginBottom: 18 }}>
+                    {viewStat.file.split('/').pop()} (by {viewStat.uploader_name})
+                  </h3>
+                  <iframe
+                    src={`http://localhost:2800/media/${viewStat.file}`}
+                    title="Statistic Document"
+                    style={{ width: '100%', height: '50vh', border: 'none', marginBottom: 16, background: '#f8f9fc' }}
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                    <button
+                      style={{ background: '#28a745', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 6, fontWeight: 600, fontSize: '1rem', cursor: 'pointer' }}
+                      onClick={() => handleApproveStatisticModal(viewStat.id)}
+                    >
+                      Approve
+                    </button>
+                    <button
+                      style={{ background: '#dc3545', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 6, fontWeight: 600, fontSize: '1rem', cursor: 'pointer' }}
+                      onClick={() => handleRejectStatisticModal(viewStat.id)}
+                    >
+                      Reject
+                    </button>
+                    <button
+                      style={{ background: '#888', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 6, fontWeight: 600, fontSize: '1rem', cursor: 'pointer' }}
+                      onClick={() => setViewStat(null)}
                     >
                       Close
                     </button>

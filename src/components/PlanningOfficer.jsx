@@ -439,16 +439,14 @@ const PlanningDashboard = ({ user, onLogout }) => {
                 boxShadow: '0 2px 4px rgba(0,0,0,0.1)' 
               }}>
                 {recentActivities.map((activity, idx) => {
-                  // Map status for display
-                  let displayStatus = activity.status;
-                  if (activity.status === 'reviewed') {
-                    displayStatus = 'approved';
-                  }
-                  
-                  // Determine color based on displayStatus
+                  // Show actual status (no remapping)
+                  const displayStatus = activity.status || 'pending';
+
+                  // Determine color based on status
                   let statusColor = '#6b7280'; // default gray
                   if (displayStatus === 'pending') statusColor = '#f59e0b'; // yellow
-                  else if (displayStatus === 'approved') statusColor = '#10b981'; // green
+                  else if (displayStatus === 'reviewed') statusColor = '#2563eb'; // blue (approved by HoDvn, awaiting HoDept)
+                  else if (displayStatus === 'approved') statusColor = '#10b981'; // green (fully approved)
                   else if (displayStatus === 'rejected') statusColor = '#ef4444'; // red
                   
                   return (
@@ -506,6 +504,7 @@ const PlanningDashboard = ({ user, onLogout }) => {
                         marginRight: 12,
                         fontWeight: 'bold',
                         color: (plan.status || 'pending') === 'pending' ? '#f59e0b'
+                          : plan.status === 'reviewed' ? '#2563eb'   // added: reviewed => blue
                           : plan.status === 'approved' ? '#10b981'
                           : plan.status === 'rejected' ? '#ef4444'
                           : '#6b7280'

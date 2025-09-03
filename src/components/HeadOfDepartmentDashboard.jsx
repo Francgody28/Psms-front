@@ -102,8 +102,17 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
 
   const handleApprovePlanModal = async (planId) => {
     try {
-      const res = await api.approvePlan(planId);
-      setPopupMessage(res.message || 'Plan approved');
+      const res = await fetch(`http://localhost:2800/api/auth/review-plan/${planId}/`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Token ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'approve' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to approve plan');
+      setPopupMessage(data.message || 'Plan approved');
       setPopupType('update');
       setViewPlan(null);
       fetchDashboardData();
@@ -114,12 +123,27 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
     }
   };
 
-  const handleRejectPlanModal = async () => {
-    setPopupMessage('Plan rejected (implement backend logic)');
-    setPopupType('delete');
-    setViewPlan(null);
-    fetchDashboardData();
-    fetchPendingPlans();
+  const handleRejectPlanModal = async (planId) => {
+    try {
+      const res = await fetch(`http://localhost:2800/api/auth/review-plan/${planId}/`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Token ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'reject' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to reject plan');
+      setPopupMessage(data.message || 'Plan rejected');
+      setPopupType('delete');
+      setViewPlan(null);
+      fetchDashboardData();
+      fetchPendingPlans();
+    } catch (err) {
+      setPopupMessage(err.message || 'Failed to reject plan');
+      setPopupType('delete');
+    }
   };
 
   if (loading) {
@@ -216,19 +240,34 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
             {/* Plans to approve */}
             <div style={{ marginBottom: 12 }}>
               <h4 style={{ marginBottom: 8 }}>Plans</h4>
-              {plans && plans.length ? plans.map(p => (
-                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                  <div style={{ flex: 1 }}>
-                    {p.file.split('/').pop()} (by {p.uploader_name})
+              {plans && plans.length ? plans.map(p => {
+                const status = p.status || 'pending';
+                // status label colors: pending=yellow, reviewed=blue, approved=green, rejected=red
+                const statusColor = status === 'rejected' ? '#ef4444'
+                  : status === 'approved' ? '#10b981'
+                  : status === 'reviewed' ? '#2563eb'
+                  : '#f59e0b';
+                // View button: blue when reviewed (awaiting HoD approval), green if already approved, red if rejected
+                const viewBg = status === 'rejected' ? '#dc3545'
+                  : status === 'approved' ? '#28a745'
+                  : '#2563eb'; // blue for reviewed (and default)
+                return (
+                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                    <div style={{ flex: 1 }}>
+                      {p.file.split('/').pop()} (by {p.uploader_name})
+                    </div>
+                    <span className={`activity-status ${status}`} style={{ backgroundColor: '', color: '' }}>
+                      <span style={{ color: statusColor, fontWeight: 700, textTransform: 'capitalize' }}>{status}</span>
+                    </span>
+                    <button
+                      style={{ background: viewBg, color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
+                      onClick={() => setViewPlan(p)}
+                    >
+                      View
+                    </button>
                   </div>
-                  <button
-                    style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
-                    onClick={() => setViewPlan(p)}
-                  >
-                    View
-                  </button>
-                </div>
-              )) : <div style={{ color: '#666' }}>No plans to approve</div>}
+                );
+              }) : <div style={{ color: '#666' }}>No plans to approve</div>}
             </div>
 
             {/* Statistics to approve */}
@@ -285,7 +324,7 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
                   />
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
                     <button
-                      style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 6, fontWeight: 600, fontSize: '1rem', cursor: 'pointer' }}
+                      style={{ background: '#28a745', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 6, fontWeight: 600, fontSize: '1rem', cursor: 'pointer' }}
                       onClick={() => handleApprovePlanModal(viewPlan.id)}
                     >
                       Approve

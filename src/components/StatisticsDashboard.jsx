@@ -18,6 +18,11 @@ const StatisticsDashboard = ({ user, onLogout }) => {
   const [myStats, setMyStats] = useState([]);
   const fileInputId = 'stat-upload-input';
 
+  const [showPreview, setShowPreview] = useState(false);
+  const [filePreview, setFilePreview] = useState(null);
+  const [fileName, setFileName] = useState('');
+  const [selectedFile, setSelectedFile] = useState(null);
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -95,9 +100,27 @@ const StatisticsDashboard = ({ user, onLogout }) => {
   const handleFileChange = async (e) => {
     const f = e.target.files && e.target.files[0];
     if (!f) return;
+    console.log('File selected:', f.name); // Debug log
+    setSelectedFile(f);
+    setFileName(f.name);
+    setFilePreview(URL.createObjectURL(f));
+    setShowPreview(true);
+    e.target.value = '';
+  };
+
+  const handleCancelUpload = () => {
+    if (filePreview) URL.revokeObjectURL(filePreview);
+    setSelectedFile(null);
+    setFilePreview(null);
+    setFileName('');
+    setShowPreview(false);
+  };
+
+  const handleConfirmUpload = async () => {
+    if (!selectedFile) return;
     try {
       const fd = new FormData();
-      fd.append('file', f);
+      fd.append('file', selectedFile);
       const res = await fetch('http://localhost:2800/api/auth/upload-statistic/', {
         method: 'POST',
         headers: { Authorization: `Token ${localStorage.getItem('token')}` },
@@ -110,35 +133,36 @@ const StatisticsDashboard = ({ user, onLogout }) => {
     } catch (err) {
       setPopupMessage(err.message || 'Upload failed');
     } finally {
-      e.target.value = '';
+      if (filePreview) URL.revokeObjectURL(filePreview);
+      setSelectedFile(null);
+      setFilePreview(null);
+      setFileName('');
+      setShowPreview(false);
     }
   };
 
-  // Sidebar navigation handlers
-  const handleSidebarNav = (route) => {
-    navigate(route);
-  };
-
-  // Simple toast popup (auto-dismiss)
-  const Popup = ({ message, type = 'update', onClose }) => {
-    useEffect(() => {
-      const t = setTimeout(onClose, 2500);
-      return () => clearTimeout(t);
-    }, [onClose]);
-    const bg = type === 'delete' ? '#dc3545' : '#28a745';
+  // Enhanced renderFilePreview with better sizing
+  const renderFilePreview = () => {
+    if (!selectedFile || !filePreview) return null;
+    const isImage = /\.(jpg|png)$/i.test(fileName);
+    const isPDF = /\.pdf$/i.test(fileName);
     return (
-      <div style={{
-        position: 'fixed',
-        top: '30px',
-        right: '30px',
-        background: bg,
-        color: '#fff',
-        padding: '12px 20px',
-        borderRadius: 8,
-        zIndex: 9999,
-        boxShadow: '0 6px 24px rgba(0,0,0,0.15)'
-      }}>
-        {message}
+      <div className="file-preview" style={{ width: '100%', height: 'auto' }}>
+        <h4>File Preview:</h4>
+        <div className="preview-container" style={{ width: '100%', height: 'auto' }}>
+          {isImage && <img src={filePreview} alt="Preview" className="image-preview" style={{ maxWidth: '100%', height: 'auto', maxHeight: '60vh' }} />}
+          {isPDF && <iframe src={filePreview} title="PDF Preview" className="pdf-preview" style={{ width: '100%', height: '70vh', border: 'none' }} />}
+          {!isImage && !isPDF && (
+            <div style={{ fontSize: 22, marginBottom: 16, background: '#f8f9fc', padding: '2rem 1rem', borderRadius: 10, minHeight: '30vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ fontSize: 40, marginBottom: 10 }}>📄</div>
+              <div style={{ fontWeight: 600, marginBottom: 6 }}>{fileName}</div>
+              <div style={{ color: '#555', fontSize: 15 }}>Preview not supported for this file type.</div>
+            </div>
+          )}
+          <button type="button" onClick={handleCancelUpload} className="remove-file-btn" style={{ background: '#dc3545', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 6, cursor: 'pointer', marginTop: 10 }}>
+            Remove File
+          </button>
+        </div>
       </div>
     );
   };
@@ -316,6 +340,44 @@ const StatisticsDashboard = ({ user, onLogout }) => {
           </div>
         </div>
       </div>
+
+      {/* Preview Modal with increased min-height */}
+      {showPreview && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.35)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <div style={{
+            background: '#fff',
+            borderRadius: 12,
+            padding: 32,
+            minWidth: '60vw',
+            maxWidth: '60vw',
+            minHeight: '70vh', // Increased for better preview space
+            boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between'
+          }}>
+            <h3 style={{ marginTop: 0, marginBottom: 18 }}>Preview Document</h3>
+            {renderFilePreview()}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+              <button style={{ background: '#28a745', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 6, fontWeight: 600, fontSize: '1rem', cursor: 'pointer' }} onClick={handleConfirmUpload}>
+                Upload
+              </button>
+              <button style={{ background: '#dc3545', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 6, fontWeight: 600, fontSize: '1rem', cursor: 'pointer' }} onClick={handleCancelUpload}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

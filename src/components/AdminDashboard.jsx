@@ -476,6 +476,7 @@ const AdminDashboard = ({ user, onLogout }) => {
               <option value="statistics_officer">Statistics Officer</option>
               <option value="head_of_division">Head of Division</option>
               <option value="head_of_department">Head of Department</option>
+              <option value="director_general">Director General</option>
             </select>
             <button type="submit">Register Employee</button>
           </form>
@@ -542,6 +543,7 @@ const AdminDashboard = ({ user, onLogout }) => {
               <option value="statistics_officer">Statistics Officer</option>
               <option value="head_of_division">Head of Division</option>
               <option value="head_of_department">Head of Department</option>
+              <option value="director_general">Director General</option>
             </select>
             <div className="form-buttons">
               <button type="submit">Update User</button>

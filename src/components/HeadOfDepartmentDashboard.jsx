@@ -14,8 +14,24 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
   // Statistics approvals
   const [stats, setStats] = useState([]);
   const [viewStat, setViewStat] = useState(null);
+  // NEW: approved plans
+  const [approvedPlans, setApprovedPlans] = useState([]);
 
   const navigate = useNavigate();
+
+  // NEW: move above useEffect to avoid TDZ
+  const fetchApprovedPlans = React.useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:2800/api/auth/approved-plans/', {
+        headers: { Authorization: `Token ${localStorage.getItem('token')}` },
+      });
+      if (!res.ok) throw new Error('Failed to load approved plans');
+      const data = await res.json();
+      setApprovedPlans(Array.isArray(data) ? data.filter(p => p.file) : []);
+    } catch {
+      setApprovedPlans(plans.filter?.(p => p.status === 'approved') || []);
+    }
+  }, [plans]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -32,7 +48,9 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
         setStats([]);
       }
     })();
-  }, [popupMessage]);
+    // NEW: fetch approved plans
+    fetchApprovedPlans();
+  }, [popupMessage, fetchApprovedPlans]);
 
   const fetchDashboardData = async () => {
     try {
@@ -121,6 +139,18 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
       setViewPlan(null);
       fetchDashboardData();
       fetchPendingPlans();
+      // Optimistic update with duplicate guard
+      setApprovedPlans(prev => {
+        const approved = plans.find(p => p.id === planId) || viewPlan;
+        if (!approved) return prev;
+        const exists = prev.some(pp => pp.id === approved.id);
+        return exists
+          ? prev.map(pp => (pp.id === approved.id ? { ...pp, status: 'approved' } : pp))
+          : [...prev, { ...approved, status: 'approved' }];
+      });
+      setPlans(prev => prev.filter(p => p.id !== planId));
+      // NEW: refresh approved plans
+      fetchApprovedPlans();
     } catch (err) {
       setPopupMessage(err.message || 'Failed to approve plan');
       setPopupType('delete');
@@ -172,7 +202,8 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
           const r2 = await fetch('http://localhost:2800/api/auth/pending-statistics/', {
             headers: { Authorization: `Token ${localStorage.getItem('token')}` },
           });
-          setStats(Array.isArray(await r2.json()) ? (await r2.json()) : []);
+          const d2 = await r2.json(); // FIX: read JSON once
+          setStats(Array.isArray(d2) ? d2.filter(s => s.file) : []);
         } catch {
           // Error intentionally ignored
         }
@@ -204,7 +235,8 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
           const r2 = await fetch('http://localhost:2800/api/auth/pending-statistics/', {
             headers: { Authorization: `Token ${localStorage.getItem('token')}` },
           });
-          setStats(Array.isArray(await r2.json()) ? (await r2.json()) : []);
+          const d2 = await r2.json(); // FIX: read JSON once
+          setStats(Array.isArray(d2) ? d2.filter(s => s.file) : []);
         } catch {
           // Error intentionally ignored
         }
@@ -232,7 +264,8 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
         </div>
         <nav className="sidebar-nav">
           <ul>
-            <li>Dashboard</li>
+            {/* Make Dashboard go home */}
+            <li onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>Dashboard</li>
             <li onClick={() => navigate('/statistics-dashboard')} style={{ cursor: 'pointer' }}>Statistics</li>
             <li onClick={() => navigate('/planning-dashboard')} style={{ cursor: 'pointer' }}>Plans</li>
             <li onClick={handleLogout} style={{ cursor: 'pointer', color: '#fff' }}>Logout</li>
@@ -337,6 +370,23 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
                   </div>
                 );
               }) : <div style={{ color: '#666' }}>No plans to approve</div>}
+            </div>
+
+            {/* NEW: Approved Plans */}
+            <div style={{ marginBottom: 12, marginTop: 16 }}>
+              <h4 style={{ marginBottom: 8 }}>Approved Plans</h4>
+              {approvedPlans && approvedPlans.length ? approvedPlans.map(p => (
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                  <div style={{ flex: 1 }}>{p.file.split('/').pop()} (by {p.uploader_name})</div>
+                  <span><span style={{ color: '#10b981', fontWeight: 700, textTransform: 'capitalize' }}>approved</span></span>
+                  <button
+                    style={{ background: '#28a745', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
+                    onClick={() => setViewPlan(p)}
+                  >
+                    View
+                  </button>
+                </div>
+              )) : <div style={{ color: '#666' }}>No approved plans</div>}
             </div>
 
             {/* Statistics to approve */}

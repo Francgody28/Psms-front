@@ -7,6 +7,7 @@ import PlanningDashboard from './components/PlanningOfficer'
 import StatisticsDashboard from './components/StatisticsDashboard'
 import HeadOfDivisionDashboard from './components/HeadOfDivisionDashboard'
 import HeadOfDepartmentDashboard from './components/HeadOfDepartmentDashboard'
+import DirectorGeneralDashboard from './components/DirectorGeneralDashboard';
 import './App.css'
 
 function App() {
@@ -45,6 +46,8 @@ function App() {
         return '/head-of-division-dashboard'
       case 'head_of_department':
         return '/head-of-department-dashboard'
+      case 'director_general':
+        return '/director-general-dashboard' // added
       case 'planning_officer':
         return '/planning-dashboard'
       case 'statistics_officer':
@@ -147,6 +150,19 @@ function App() {
           element={
             isAuthenticated && userRole === 'user' ? (
               <SimpleUserDashboard 
+                user={userData || { username: user }}
+                onLogout={handleLogout}
+              />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/director-general-dashboard"
+          element={
+            isAuthenticated && userRole === 'director_general' ? (
+              <DirectorGeneralDashboard
                 user={userData || { username: user }}
                 onLogout={handleLogout}
               />

@@ -8,11 +8,11 @@ const PlanningDashboard = ({ user, onLogout }) => {
   const fileInputRef = useRef(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
-  const [textPreview, setTextPreview] = useState('');
-  const [textLoaded, setTextLoaded] = useState(false);
   const [pendingPlans, setPendingPlans] = useState([]);
   const [recentActivities, setRecentActivities] = useState([]);
   const [refreshKey, setRefreshKey] = useState(0); // Add refresh key
+  const [filePreview, setFilePreview] = useState(null);
+  const [fileName, setFileName] = useState('');
 
   // Example static values; replace with real data as needed
   const receivedBudget = 100000000;
@@ -116,15 +116,21 @@ const PlanningDashboard = ({ user, onLogout }) => {
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+      const file = e.target.files[0];
+      setSelectedFile(file);
+      setFileName(file.name);
+      setFilePreview(URL.createObjectURL(file));
       setShowPreview(true);
-      setTextPreview('');
-      setTextLoaded(false);
+      setShowPreview(true);
+      setShowPreview(true);
     }
   };
 
   const handleCancelUpload = () => {
+    if (filePreview) URL.revokeObjectURL(filePreview);
     setSelectedFile(null);
+    setFilePreview(null);
+    setFileName('');
     setShowPreview(false);
   };
 
@@ -168,7 +174,10 @@ const PlanningDashboard = ({ user, onLogout }) => {
       console.error('Upload error:', e);
       alert('Upload error: ' + e.message);
     }
+    if (filePreview) URL.revokeObjectURL(filePreview);
     setSelectedFile(null);
+    setFilePreview(null);
+    setFileName('');
     setShowPreview(false);
   };
 
@@ -195,121 +204,28 @@ const PlanningDashboard = ({ user, onLogout }) => {
     navigate(route);
   };
 
-  // Helper for preview
+  // Enhanced renderFilePreview with better sizing
   const renderFilePreview = () => {
-    if (!selectedFile) return null;
-    const fileType = selectedFile.type;
-    const ext = selectedFile.name.split('.').pop().toLowerCase();
-
-    if (fileType === 'application/pdf') {
-      const url = URL.createObjectURL(selectedFile);
-      return (
-        <iframe
-          src={url}
-          title="PDF Preview"
-          style={{
-            width: '100%',
-            height: '50vh',
-            border: 'none',
-            marginBottom: 16,
-            background: '#f8f9fc'
-          }}
-        />
-      );
-    }
-
-    if (
-      ext === 'doc' || ext === 'docx' ||
-      ext === 'xls' || ext === 'xlsx'
-    ) {
-      if (fileType.startsWith('text/')) {
-        if (!textLoaded) {
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            setTextPreview(e.target.result);
-            setTextLoaded(true);
-          };
-          reader.readAsText(selectedFile);
-        }
-        return (
-          <pre style={{
-            width: '100%',
-            height: '40vh',
-            overflow: 'auto',
-            background: '#f8f9fc',
-            borderRadius: 8,
-            padding: 16,
-            fontSize: 15,
-            marginBottom: 16
-          }}>{textPreview || "Loading..."}</pre>
-        );
-      }
-
-      // Fallback: show file name and info
-      let icon = ext === 'doc' || ext === 'docx' ? '📝' : '📊';
-      let label = ext === 'doc' || ext === 'docx' ? 'Word Document' : 'Excel Spreadsheet';
-      return (
-        <div style={{
-          fontSize: 22,
-          marginBottom: 16,
-          background: '#f8f9fc',
-          padding: '2rem 1rem',
-          borderRadius: 10,
-          minHeight: '25vh',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <div style={{ fontSize: 40, marginBottom: 10 }}>{icon}</div>
-          <div style={{ fontWeight: 600, marginBottom: 6 }}>{selectedFile.name}</div>
-          <div style={{ color: '#555', fontSize: 15 }}>
-            {label} preview is not supported for local files. Please upload to view content online.
-          </div>
-        </div>
-      );
-    }
-
-    if (fileType.startsWith('text/')) {
-      if (!textLoaded) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          setTextPreview(e.target.result);
-          setTextLoaded(true);
-        };
-        reader.readAsText(selectedFile);
-      }
-      return (
-        <pre style={{
-          width: '100%',
-          height: '40vh',
-          overflow: 'auto',
-          background: '#f8f9fc',
-          borderRadius: 8,
-          padding: 16,
-          fontSize: 15,
-          marginBottom: 16
-        }}>{textPreview || "Loading..."}</pre>
-      );
-    }
-
-    // Fallback for other files
+    if (!selectedFile || !filePreview) return null;
+    const isImage = /\.(jpg|png)$/i.test(fileName);
+    const isPDF = /\.pdf$/i.test(fileName);
     return (
-      <div style={{
-        fontSize: 22,
-        marginBottom: 16,
-        background: '#f8f9fc',
-        padding: '2rem 1rem',
-        borderRadius: 10,
-        minHeight: '25vh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}>
-        <div style={{ fontSize: 40, marginBottom: 10 }}>📄</div>
-        <div style={{ fontWeight: 600, marginBottom: 6 }}>{selectedFile.name}</div>
-        <div style={{ color: '#555', fontSize: 15 }}>Preview not supported for this file type.</div>
+      <div className="file-preview" style={{ width: '100%', height: 'auto' }}>
+        <h4>File Preview:</h4>
+        <div className="preview-container" style={{ width: '100%', height: 'auto' }}>
+          {isImage && <img src={filePreview} alt="Preview" className="image-preview" style={{ maxWidth: '100%', height: 'auto', maxHeight: '60vh' }} />}
+          {isPDF && <iframe src={filePreview} title="PDF Preview" className="pdf-preview" style={{ width: '100%', height: '70vh', border: 'none' }} />}
+          {!isImage && !isPDF && (
+            <div style={{ fontSize: 22, marginBottom: 16, background: '#f8f9fc', padding: '2rem 1rem', borderRadius: 10, minHeight: '30vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ fontSize: 40, marginBottom: 10 }}>📄</div>
+              <div style={{ fontWeight: 600, marginBottom: 6 }}>{fileName}</div>
+              <div style={{ color: '#555', fontSize: 15 }}>Preview not supported for this file type.</div>
+            </div>
+          )}
+          <button type="button" onClick={handleCancelUpload} className="remove-file-btn" style={{ background: '#dc3545', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 6, cursor: 'pointer', marginTop: 10 }}>
+            Remove File
+          </button>
+        </div>
       </div>
     );
   };
@@ -384,7 +300,7 @@ const PlanningDashboard = ({ user, onLogout }) => {
               accept=".xlsx,.xls,.doc,.docx,.pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf"
               onChange={handleFileChange}
             />
-            {/* Modal for preview */}
+            {/* Modal for preview with increased min-height */}
             {showPreview && (
               <div style={{
                 position: 'fixed',
@@ -401,7 +317,7 @@ const PlanningDashboard = ({ user, onLogout }) => {
                   padding: 32,
                   minWidth: '60vw',
                   maxWidth: '60vw',
-                  minHeight: '60vh',
+                  minHeight: '70vh', // Increased for better preview space
                   boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
                   position: 'relative',
                   display: 'flex',

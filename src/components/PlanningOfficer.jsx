@@ -13,11 +13,13 @@ const PlanningDashboard = ({ user, onLogout }) => {
   const [refreshKey, setRefreshKey] = useState(0); // Add refresh key
   const [filePreview, setFilePreview] = useState(null);
   const [fileName, setFileName] = useState('');
+  const [showCreateDropdown, setShowCreateDropdown] = useState(false);
+  const [selectedPlanType, setSelectedPlanType] = useState('');
 
-  // Example static values; replace with real data as needed
-  const receivedBudget = 100000000;
-  const usedBudget = 32000000;
-  const projection = 200000000;
+  // Add budget states
+  const [receivedBudget, setReceivedBudget] = useState(100000000);
+  const [usedBudget, setUsedBudget] = useState(32000000);
+  const [projection, setProjection] = useState(200000000);
 
   // Fetch pending plans for head_of_division
   useEffect(() => {
@@ -100,6 +102,16 @@ const PlanningDashboard = ({ user, onLogout }) => {
     }
   }, [user, refreshKey]); // Add refreshKey to dependencies
 
+  // Add useEffect to load budgets from localStorage
+  useEffect(() => {
+    const rb = localStorage.getItem('receivedBudget') || 100000000;
+    setReceivedBudget(Number(rb));
+    const ub = localStorage.getItem('usedBudget') || 32000000;
+    setUsedBudget(Number(ub));
+    const pr = localStorage.getItem('projection') || 200000000;
+    setProjection(Number(pr));
+  }, []);
+
   const handleLogout = async () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -139,6 +151,9 @@ const PlanningDashboard = ({ user, onLogout }) => {
     const formData = new FormData();
     formData.append('file', selectedFile);
     formData.append('upload_date', new Date().toISOString());
+    if (selectedPlanType) {
+      formData.append('plan_type', selectedPlanType);
+    }
 
     try {
       const token = localStorage.getItem('token');
@@ -179,6 +194,7 @@ const PlanningDashboard = ({ user, onLogout }) => {
     setFilePreview(null);
     setFileName('');
     setShowPreview(false);
+    setSelectedPlanType(''); // Reset after upload
   };
 
   // Approve plan handler (now handles both approve and reject)
@@ -291,7 +307,47 @@ const PlanningDashboard = ({ user, onLogout }) => {
           </div>
           {/* Action Buttons */}
           <div style={{ marginTop: '1.5rem' }}>
-            <button style={blueBtn}>Create Plan</button>
+            <div style={{ position: 'relative', display: 'inline-block' }}>
+              <button style={blueBtn} onClick={() => setShowCreateDropdown(!showCreateDropdown)}>Create Plan</button>
+              {showCreateDropdown && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  background: '#fff',
+                  border: '1px solid #ccc',
+                  borderRadius: '6px',
+                  zIndex: 10,
+                  minWidth: '150px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                }}>
+                  <div
+                    onClick={() => { setSelectedPlanType('monthly'); setShowCreateDropdown(false); handleUploadClick(); }}
+                    style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #eee' }}
+                    onMouseEnter={(e) => e.target.style.background = '#f0f0f0'}
+                    onMouseLeave={(e) => e.target.style.background = '#fff'}
+                  >
+                    Monthly
+                  </div>
+                  <div
+                    onClick={() => { setSelectedPlanType('quarterly'); setShowCreateDropdown(false); handleUploadClick(); }}
+                    style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #eee' }}
+                    onMouseEnter={(e) => e.target.style.background = '#f0f0f0'}
+                    onMouseLeave={(e) => e.target.style.background = '#fff'}
+                  >
+                    Quarterly
+                  </div>
+                  <div
+                    onClick={() => { setSelectedPlanType('semi-annually'); setShowCreateDropdown(false); handleUploadClick(); }}
+                    style={{ padding: '8px 12px', cursor: 'pointer' }}
+                    onMouseEnter={(e) => e.target.style.background = '#f0f0f0'}
+                    onMouseLeave={(e) => e.target.style.background = '#fff'}
+                  >
+                    Semi-Annually
+                  </div>
+                </div>
+              )}
+            </div>
             <button style={blueBtn} onClick={handleUploadClick}>Upload Plan</button>
             <input
               type="file"

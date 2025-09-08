@@ -19,8 +19,6 @@ const HeadOfDivisionDashboard = ({ user, onLogout }) => {
 
   const navigate = useNavigate();
 
-  // Only allow head_of_division role
-
   // NEW: move above useEffect to avoid TDZ
   const fetchApprovedPlans = React.useCallback(async () => {
     try {
@@ -34,6 +32,11 @@ const HeadOfDivisionDashboard = ({ user, onLogout }) => {
       setApprovedPlans(plans.filter?.(p => p.status === 'approved') || []);
     }
   }, [plans]);
+
+  // Add budget states
+  const [receivedBudget, setReceivedBudget] = useState(100000000);
+  const [usedBudget, setUsedBudget] = useState(32000000);
+  const [projection, setProjection] = useState(200000000);
 
   useEffect(() => {
     fetchDashboardData();
@@ -52,6 +55,16 @@ const HeadOfDivisionDashboard = ({ user, onLogout }) => {
     })();
     fetchApprovedPlans();
   }, [popupMessage, fetchApprovedPlans]);
+
+  // Add useEffect to load budgets from localStorage
+  useEffect(() => {
+    const rb = localStorage.getItem('receivedBudget') || 100000000;
+    setReceivedBudget(Number(rb));
+    const ub = localStorage.getItem('usedBudget') || 32000000;
+    setUsedBudget(Number(ub));
+    const pr = localStorage.getItem('projection') || 200000000;
+    setProjection(Number(pr));
+  }, []);
 
   const fetchDashboardData = async () => {
     try {
@@ -296,6 +309,25 @@ const HeadOfDivisionDashboard = ({ user, onLogout }) => {
             <div className="stat-card">
               <h3>Pending</h3>
               <p>{dashboardData?.pending_tasks || 0}</p>
+            </div>
+            {/* Budget Cards as labels */}
+            <div className="stat-card" style={{ minHeight: 120 }}>
+              <h3>Received Budget</h3>
+              <p style={{ fontSize: '2.2rem', marginBottom: 0 }}>
+                {receivedBudget.toLocaleString()}Tsh/=
+              </p>
+            </div>
+            <div className="stat-card" style={{ minHeight: 120 }}>
+              <h3>Used Budget</h3>
+              <p style={{ fontSize: '2.2rem', marginBottom: 0 }}>
+                {usedBudget.toLocaleString()}Tsh/=
+              </p>
+            </div>
+            <div className="stat-card" style={{ minHeight: 120 }}>
+              <h3>Projection</h3>
+              <p style={{ fontSize: '1.9rem', marginBottom: 0 }}>
+                {projection.toLocaleString()}Tsh/=
+              </p>
             </div>
           </div>
 

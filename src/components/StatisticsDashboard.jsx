@@ -25,6 +25,15 @@ const StatisticsDashboard = ({ user, onLogout }) => {
 
   const navigate = useNavigate();
 
+  // Add budget states
+  const [receivedBudget, setReceivedBudget] = useState(100000000);
+  const [usedBudget, setUsedBudget] = useState(32000000);
+  const [projection, setProjection] = useState(200000000);
+
+  const handleSidebarNav = (route) => {
+    navigate(route);
+  };
+
   useEffect(() => {
     fetchDashboardData();
     if (!profileState) {
@@ -41,6 +50,16 @@ const StatisticsDashboard = ({ user, onLogout }) => {
     }
     // eslint-disable-next-line
   }, [profileState, refreshKey]);
+
+  // Add useEffect to load budgets from localStorage
+  useEffect(() => {
+    const rb = localStorage.getItem('receivedBudget') || 100000000;
+    setReceivedBudget(Number(rb));
+    const ub = localStorage.getItem('usedBudget') || 32000000;
+    setUsedBudget(Number(ub));
+    const pr = localStorage.getItem('projection') || 200000000;
+    setProjection(Number(pr));
+  }, []);
 
   // Fetch my statistics (for pending on statistics officer)
   useEffect(() => {
@@ -271,6 +290,25 @@ const StatisticsDashboard = ({ user, onLogout }) => {
                   <p>{stat.value}</p>
                 </div>
               ))}
+              {/* Budget Cards as labels */}
+              <div className="stat-card" style={{ minHeight: 120 }}>
+                <h3>Received Budget</h3>
+                <p style={{ fontSize: '2.2rem', marginBottom: 0 }}>
+                  {receivedBudget.toLocaleString()}Tsh/=
+                </p>
+              </div>
+              <div className="stat-card" style={{ minHeight: 120 }}>
+                <h3>Used Budget</h3>
+                <p style={{ fontSize: '2.2rem', marginBottom: 0 }}>
+                  {usedBudget.toLocaleString()}Tsh/=
+                </p>
+              </div>
+              <div className="stat-card" style={{ minHeight: 120 }}>
+                <h3>Projection</h3>
+                <p style={{ fontSize: '1.9rem', marginBottom: 0 }}>
+                  {projection.toLocaleString()}Tsh/=
+                </p>
+              </div>
             </div>
 
             <div className="quick-actions">

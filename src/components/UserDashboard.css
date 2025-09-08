@@ -367,6 +367,16 @@
   background: #2563eb;
   color: #fff;
 }
+.stat-card.small {
+  min-height: 100px;     /* reduce height */
+  padding: 0.6rem;       /* smaller padding */
+}
+
+.stat-card.small input {
+  font-size: 1.4rem;     /* smaller font */
+  padding: 3px;
+}
+
 
 /* Main content should push right of sidebar */
 .dashboard-main {

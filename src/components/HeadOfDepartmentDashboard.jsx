@@ -19,19 +19,10 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
 
   const navigate = useNavigate();
 
-  // NEW: move above useEffect to avoid TDZ
-  const fetchApprovedPlans = React.useCallback(async () => {
-    try {
-      const res = await fetch('http://localhost:2800/api/auth/approved-plans/', {
-        headers: { Authorization: `Token ${localStorage.getItem('token')}` },
-      });
-      if (!res.ok) throw new Error('Failed to load approved plans');
-      const data = await res.json();
-      setApprovedPlans(Array.isArray(data) ? data.filter(p => p.file) : []);
-    } catch {
-      setApprovedPlans(plans.filter?.(p => p.status === 'approved') || []);
-    }
-  }, [plans]);
+  // Add budget states
+  const [receivedBudget, setReceivedBudget] = useState(100000000);
+  const [usedBudget, setUsedBudget] = useState(32000000);
+  const [projection, setProjection] = useState(200000000);
 
   useEffect(() => {
     fetchDashboardData();
@@ -48,9 +39,18 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
         setStats([]);
       }
     })();
-    // NEW: fetch approved plans
-    fetchApprovedPlans();
-  }, [popupMessage, fetchApprovedPlans]);
+    // Removed: fetchApprovedPlans();
+  }, [popupMessage]); // Removed fetchApprovedPlans from dependencies
+
+  // Add useEffect to load budgets from localStorage
+  useEffect(() => {
+    const rb = localStorage.getItem('receivedBudget') || 100000000;
+    setReceivedBudget(Number(rb));
+    const ub = localStorage.getItem('usedBudget') || 32000000;
+    setUsedBudget(Number(ub));
+    const pr = localStorage.getItem('projection') || 200000000;
+    setProjection(Number(pr));
+  }, []);
 
   const fetchDashboardData = async () => {
     try {
@@ -71,9 +71,13 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
         },
       });
       const data = await res.json();
-      setPlans(Array.isArray(data) ? data.filter(p => p.file) : []);
+      const filteredPlans = Array.isArray(data) ? data.filter(p => p.file) : [];
+      setPlans(filteredPlans);
+      // Set approved plans from the fetched data
+      setApprovedPlans(filteredPlans.filter(p => p.status === 'approved'));
     } catch {
       setPlans([]);
+      setApprovedPlans([]);
     }
   };
 
@@ -150,7 +154,7 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
       });
       setPlans(prev => prev.filter(p => p.id !== planId));
       // NEW: refresh approved plans
-      fetchApprovedPlans();
+      // fetchApprovedPlans();
     } catch (err) {
       setPopupMessage(err.message || 'Failed to approve plan');
       setPopupType('delete');
@@ -283,11 +287,12 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
             <p>Welcome Head of Department. Here you can manage your tasks, view statistics, approve plans/statistics, and access planning tools.</p>
           </div>
 
-          <div className="stats">
-            <div className="stat-card">
-              <h3>My Tasks</h3>
-              <p>{dashboardData?.my_tasks || 0}</p>
-            </div>
+         <div className="stats-cards" style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: '1.2rem',
+            marginBottom: '2.0rem'
+          }}>
             <div className="stat-card">
               <h3>Completed</h3>
               <p>{dashboardData?.completed_tasks || 0}</p>
@@ -295,6 +300,100 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
             <div className="stat-card">
               <h3>Pending</h3>
               <p>{dashboardData?.pending_tasks || 0}</p>
+            </div>
+            {/* Budget Cards as inputs */}
+            <div className="stat-card" style={{ minHeight: 140 }}>
+              <h3>Received Budget</h3>
+              <input
+                 type="number"
+                value={receivedBudget}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  setReceivedBudget(val);
+                  localStorage.setItem('receivedBudget', val);
+                }}
+                onFocus={(e) => {
+                  e.target.style.border = '1px solid #2563eb';
+                  e.target.style.background = '#fff';
+                }}
+                onBlur={(e) => {
+                  e.target.style.border = '1px solid #ddd';
+                  e.target.style.background = '#f9f9f9';
+                }}
+                style={{
+                  fontSize: '1.5rem',
+                  marginBottom: 0,
+                  border: '1px solid #ddd',
+                  background: '#f9f9f9',
+                  width: '100%',
+                  textAlign: 'center',
+                  padding: '1rem',
+                  borderRadius: '4px'
+                }}
+              />
+              Tsh/=
+            </div>
+            <div className="stat-card" style={{ minHeight: 140 }}>
+              <h3>Used Budget</h3>
+              <input
+                type="number"
+                value={usedBudget}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  setUsedBudget(val);
+                  localStorage.setItem('usedBudget', val);
+                }}
+                onFocus={(e) => {
+                  e.target.style.border = '1px solid #2563eb';
+                  e.target.style.background = '#fff';
+                }}
+                onBlur={(e) => {
+                  e.target.style.border = '1px solid #ddd';
+                  e.target.style.background = '#f9f9f9';
+                }}
+                style={{
+                  fontSize: '1.5rem',
+                  marginBottom: 0,
+                  border: '1px solid #ddd',
+                  background: '#f9f9f9',
+                  width: '100%',
+                  textAlign: 'center',
+                  padding: '1rem',
+                  borderRadius: '4px'
+                }}
+              />
+              Tsh/=
+            </div>
+            <div className="stat-card" style={{ minHeight: 140 }}>
+              <h3>Projection</h3>
+              <input
+                type="number"
+                value={projection}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  setProjection(val);
+                  localStorage.setItem('projection', val);
+                }}
+                onFocus={(e) => {
+                  e.target.style.border = '1px solid #2563eb';
+                  e.target.style.background = '#fff';
+                }}
+                onBlur={(e) => {
+                  e.target.style.border = '1px solid #ddd';
+                  e.target.style.background = '#f9f9f9';
+                }}
+                style={{
+                  fontSize: '1.5rem',
+                  marginBottom: 0,
+                  border: '1px solid #ddd',
+                  background: '#f9f9f9',
+                  width: '100%',
+                  textAlign: 'center',
+                  padding: '1rem',
+                  borderRadius: '4px'
+                }}
+              />
+              Tsh/=
             </div>
           </div>
 
@@ -358,8 +457,17 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
                     <div style={{ flex: 1 }}>
                       {p.file.split('/').pop()} (by {p.uploader_name})
                     </div>
-                    <span className={`activity-status ${status}`} style={{ backgroundColor: '', color: '' }}>
-                      <span style={{ color: statusColor, fontWeight: 700, textTransform: 'capitalize' }}>{status}</span>
+                    <span
+                      style={{
+                        background: status === 'reviewed' ? '#fff' : '',
+                        color: status === 'reviewed' ? '#2563eb' : statusColor,
+                        fontWeight: 700,
+                        textTransform: 'capitalize',
+                        padding: status === 'reviewed' ? '2px 8px' : '',
+                        borderRadius: status === 'reviewed' ? '4px' : ''
+                      }}
+                    >
+                      {status}
                     </span>
                     <button
                       style={{ background: viewBg, color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}

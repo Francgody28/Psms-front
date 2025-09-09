@@ -18,10 +18,16 @@ const StatisticsDashboard = ({ user, onLogout }) => {
   const [myStats, setMyStats] = useState([]);
   const fileInputId = 'stat-upload-input';
 
-  const [showPreview, setShowPreview] = useState(false);
   const [filePreview, setFilePreview] = useState(null);
   const [fileName, setFileName] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
+  const [showPreview, setShowPreview] = useState(false);
+
+  // Add localStorageOptions state
+  const [localStorageOptions, setLocalStorageOptions] = useState(() => {
+    const stored = localStorage.getItem('createdStatistics');
+    return stored ? JSON.parse(stored) : [];
+  });
 
   const navigate = useNavigate();
 
@@ -135,11 +141,41 @@ const StatisticsDashboard = ({ user, onLogout }) => {
     setShowPreview(false);
   };
 
+  const [showCreateDropdown, setShowCreateDropdown] = useState(false);
+  const [selectedStatType, setSelectedStatType] = useState('');
+
+  // simple toast popup (auto-dismiss)
+  const Popup = ({ message, type = 'update', onClose }) => {
+    useEffect(() => {
+      const t = setTimeout(onClose, 2500);
+      return () => clearTimeout(t);
+    }, [onClose]);
+    const bg = type === 'delete' ? '#dc3545' : '#28a745';
+    return (
+      <div style={{
+        position: 'fixed',
+        top: '30px',
+        right: '30px',
+        background: bg,
+        color: '#fff',
+        padding: '12px 20px',
+        borderRadius: 8,
+        zIndex: 9999,
+        boxShadow: '0 6px 24px rgba(0,0,0,0.15)'
+      }}>
+        {message}
+      </div>
+    );
+  };
+
   const handleConfirmUpload = async () => {
     if (!selectedFile) return;
     try {
       const fd = new FormData();
       fd.append('file', selectedFile);
+      if (selectedStatType) {
+        fd.append('stat_type', selectedStatType);
+      }
       const res = await fetch('http://localhost:2800/api/auth/upload-statistic/', {
         method: 'POST',
         headers: { Authorization: `Token ${localStorage.getItem('token')}` },
@@ -149,6 +185,11 @@ const StatisticsDashboard = ({ user, onLogout }) => {
       if (!res.ok) throw new Error(data.error || 'Upload failed');
       setPopupMessage('Data uploaded successfully');
       setRefreshKey(k => k + 1);
+      // Save to local storage
+      const newOption = { id: Date.now(), type: selectedStatType, file: selectedFile.name, createdAt: new Date().toISOString() };
+      const updatedOptions = [...localStorageOptions, newOption];
+      setLocalStorageOptions(updatedOptions);
+      localStorage.setItem('createdStatistics', JSON.stringify(updatedOptions));
     } catch (err) {
       setPopupMessage(err.message || 'Upload failed');
     } finally {
@@ -156,7 +197,38 @@ const StatisticsDashboard = ({ user, onLogout }) => {
       setSelectedFile(null);
       setFilePreview(null);
       setFileName('');
+      setSelectedStatType(''); // Reset after upload
       setShowPreview(false);
+    }
+  };
+
+  // Approve statistic handler
+  const handleApproveStatisticModal = async (statId) => {
+    try {
+      const res = await fetch(`http://localhost:2800/api/auth/approve-statistic/${statId}/`, {
+        method: 'POST',
+        headers: { Authorization: `Token ${localStorage.getItem('token')}` },
+      });
+      if (!res.ok) throw new Error('Failed to approve statistic');
+      setPopupMessage('Statistic approved successfully');
+      setRefreshKey(k => k + 1);
+    } catch (err) {
+      setPopupMessage(err.message || 'Failed to approve statistic');
+    }
+  };
+
+  // Reject statistic handler
+  const handleRejectStatisticModal = async (statId) => {
+    try {
+      const res = await fetch(`http://localhost:2800/api/auth/reject-statistic/${statId}/`, {
+        method: 'POST',
+        headers: { Authorization: `Token ${localStorage.getItem('token')}` },
+      });
+      if (!res.ok) throw new Error('Failed to reject statistic');
+      setPopupMessage('Statistic rejected successfully');
+      setRefreshKey(k => k + 1);
+    } catch (err) {
+      setPopupMessage(err.message || 'Failed to reject statistic');
     }
   };
 
@@ -312,20 +384,53 @@ const StatisticsDashboard = ({ user, onLogout }) => {
             </div>
 
             <div className="quick-actions">
-              <div className="action-card">
-                <h4>Create Statistics</h4>
-                <p>Create and manage your statistical data</p>
+              <div style={{ position: 'relative', display: 'inline-block' }}>
+                <div className="action-card" onClick={() => setShowCreateDropdown(!showCreateDropdown)} style={{ cursor: 'pointer' }}>
+                  <h4>Create Statistics</h4>
+                  <p>Create and manage your statistical data</p>
+                </div>
+                {showCreateDropdown && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    background: '#fff',
+                    border: '1px solid #ccc',
+                    borderRadius: '6px',
+                    zIndex: 10,
+                    minWidth: '150px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                  }}>
+                    <div
+                      onClick={() => { setSelectedStatType('monthly'); setShowCreateDropdown(false); handleUploadClick(); }}
+                      style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #eee' }}
+                      onMouseEnter={(e) => e.target.style.background = '#f0f0f0'}
+                      onMouseLeave={(e) => e.target.style.background = '#fff'}
+                    >
+                      Monthly
+                    </div>
+                    <div
+                      onClick={() => { setSelectedStatType('quarterly'); setShowCreateDropdown(false); handleUploadClick(); }}
+                      style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #eee' }}
+                      onMouseEnter={(e) => e.target.style.background = '#f0f0f0'}
+                      onMouseLeave={(e) => e.target.style.background = '#fff'}
+                    >
+                      Quarterly
+                    </div>
+                    <div
+                      onClick={() => { setSelectedStatType('semi-annually'); setShowCreateDropdown(false); handleUploadClick(); }}
+                      style={{ padding: '8px 12px', cursor: 'pointer' }}
+                      onMouseEnter={(e) => e.target.style.background = '#f0f0f0'}
+                      onMouseLeave={(e) => e.target.style.background = '#fff'}
+                    >
+                      Semi-Annually
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="action-card" onClick={handleUploadClick} style={{ cursor: 'pointer' }}>
                 <h4>Upload Data</h4>
                 <p>Upload statistical datasets and reports</p>
-                <input
-                  id={fileInputId}
-                  type="file"
-                  accept=".xlsx,.xls,.doc,.docx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                  onChange={handleFileChange}
-                  style={{ display: 'none' }}
-                />
               </div>
               <div className="action-card">
                 <h4>Generate Reports</h4>
@@ -369,6 +474,22 @@ const StatisticsDashboard = ({ user, onLogout }) => {
                       <div className="activity-date">{s.uploaded_at ? new Date(s.uploaded_at).toLocaleString() : ''}</div>
                     </div>
                     <span style={{ color, fontWeight: 700, textTransform: 'capitalize' }}>{status}</span>
+                    {status === 'pending' && (
+                      <>
+                        <button
+                          style={{ background: '#28a745', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer', marginLeft: 10 }}
+                          onClick={() => handleApproveStatisticModal(s.id)}
+                        >
+                          Approve
+                        </button>
+                        <button
+                          style={{ background: '#dc3545', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer', marginLeft: 10 }}
+                          onClick={() => handleRejectStatisticModal(s.id)}
+                        >
+                          Reject
+                        </button>
+                      </>
+                    )}
                   </div>
                 );
               }) : <p>No uploads yet.</p>}
@@ -379,7 +500,15 @@ const StatisticsDashboard = ({ user, onLogout }) => {
         </div>
       </div>
 
-      {/* Preview Modal with increased min-height */}
+      <input
+        id={fileInputId}
+        type="file"
+        accept=".xlsx,.xls,.doc,.docx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        onChange={handleFileChange}
+        style={{ display: 'none' }}
+      />
+
+      {/* Preview Modal */}
       {showPreview && (
         <div style={{
           position: 'fixed',
@@ -396,7 +525,7 @@ const StatisticsDashboard = ({ user, onLogout }) => {
             padding: 32,
             minWidth: '60vw',
             maxWidth: '60vw',
-            minHeight: '70vh', // Increased for better preview space
+            minHeight: '70vh',
             boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
             position: 'relative',
             display: 'flex',
@@ -406,10 +535,16 @@ const StatisticsDashboard = ({ user, onLogout }) => {
             <h3 style={{ marginTop: 0, marginBottom: 18 }}>Preview Document</h3>
             {renderFilePreview()}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-              <button style={{ background: '#28a745', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 6, fontWeight: 600, fontSize: '1rem', cursor: 'pointer' }} onClick={handleConfirmUpload}>
+              <button
+                style={{ background: '#28a745', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 6, fontWeight: 600, cursor: 'pointer' }}
+                onClick={handleConfirmUpload}
+              >
                 Upload
               </button>
-              <button style={{ background: '#dc3545', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 6, fontWeight: 600, fontSize: '1rem', cursor: 'pointer' }} onClick={handleCancelUpload}>
+              <button
+                style={{ background: '#dc3545', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 6, fontWeight: 600, cursor: 'pointer' }}
+                onClick={handleCancelUpload}
+              >
                 Cancel
               </button>
             </div>

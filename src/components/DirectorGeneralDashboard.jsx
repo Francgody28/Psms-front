@@ -9,6 +9,7 @@ export default function DirectorGeneralDashboard({ user, onLogout }) {
   const [plans, setPlans] = useState([]);
   const [stats, setStats] = useState([]);
   const [approvedPlans, setApprovedPlans] = useState([]);
+  const [approvedStats, setApprovedStats] = useState([]);
   const [viewPlan, setViewPlan] = useState(null);
   const [viewStat, setViewStat] = useState(null);
   const [popupMessage, setPopupMessage] = useState('');
@@ -37,6 +38,17 @@ export default function DirectorGeneralDashboard({ user, onLogout }) {
           }
         } catch {
           setApprovedPlans([]);
+        }
+        try {
+          const asRes = await fetch('http://localhost:2800/api/auth/approved-statistics/', { headers: { Authorization: `Token ${localStorage.getItem('token')}` } });
+          if (asRes.ok) {
+            const asData = await asRes.json();
+            setApprovedStats(Array.isArray(asData) ? asData.filter(s => s.file) : []);
+          } else {
+            setApprovedStats([]);
+          }
+        } catch {
+          setApprovedStats([]);
         }
       } catch {
         setPlans([]); setStats([]);
@@ -204,6 +216,23 @@ export default function DirectorGeneralDashboard({ user, onLogout }) {
                 </div>
               );
             }) : <p>No approved plans.</p>}
+          </div>
+
+          <div className="recent-activity">
+            <h3>Approved Statistics</h3>
+            {approvedStats.length ? approvedStats.map(s => {
+              const name = s.file.split('/').pop();
+              return (
+                <div key={s.id} className="activity-item">
+                  <div className="activity-info">
+                    <div className="activity-title">{name}</div>
+                    <div className="activity-date">{s.upload_date || s.uploaded_at || ''}</div>
+                  </div>
+                  <span className="activity-status approved">approved</span>
+                  <button style={{ marginLeft: 10 }} onClick={() => setViewStat(s)}>View</button>
+                </div>
+              );
+            }) : <p>No approved statistics.</p>}
           </div>
 
           {viewPlan && (

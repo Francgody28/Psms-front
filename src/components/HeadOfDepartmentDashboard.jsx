@@ -16,41 +16,98 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
   const [viewStat, setViewStat] = useState(null);
   // NEW: approved plans
   const [approvedPlans, setApprovedPlans] = useState([]);
+  // NEW: approved statistics
+  const [approvedStats, setApprovedStats] = useState([]);
+  const [reviewedForwardedPlans, setReviewedForwardedPlans] = useState([]); // reviewed by HoD awaiting DG
+  const [rejectedPlans, setRejectedPlans] = useState([]);
 
   const navigate = useNavigate();
 
   // Add budget states
-  const [receivedBudget, setReceivedBudget] = useState(100000000);
-  const [usedBudget, setUsedBudget] = useState(32000000);
-  const [projection, setProjection] = useState(200000000);
+  const [receivedBudget, setReceivedBudget] = useState(0);
+  const [usedBudget, setUsedBudget] = useState(0);
+  const [projection, setProjection] = useState(0);
+  const [savingBudget, setSavingBudget] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
     fetchPendingPlans();
-    // fetch statistics pending for HoDept (reviewed)
-    (async () => {
-      try {
-        const res = await fetch('http://localhost:2800/api/auth/pending-statistics/', {
-          headers: { Authorization: `Token ${localStorage.getItem('token')}` },
-        });
-        const data = await res.json();
-        setStats(Array.isArray(data) ? data.filter(s => s.file) : []);
-      } catch {
-        setStats([]);
-      }
-    })();
-    // Removed: fetchApprovedPlans();
-  }, [popupMessage]); // Removed fetchApprovedPlans from dependencies
+    fetchPendingStatistics();
+    fetchApprovedPlans();
+    fetchApprovedStatistics();
+    fetchProcessedPlans();
+    loadBudget();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [popupMessage]);
 
-  // Add useEffect to load budgets from localStorage
-  useEffect(() => {
-    const rb = localStorage.getItem('receivedBudget') || 100000000;
-    setReceivedBudget(Number(rb));
-    const ub = localStorage.getItem('usedBudget') || 32000000;
-    setUsedBudget(Number(ub));
-    const pr = localStorage.getItem('projection') || 200000000;
-    setProjection(Number(pr));
-  }, []);
+  const authHeaders = () => ({
+    Authorization: `Token ${localStorage.getItem('token')}`,
+    'Content-Type': 'application/json'
+  });
+
+  const loadBudget = async () => {
+    try {
+      const res = await fetch('http://localhost:2800/api/auth/budget/', { headers: authHeaders() });
+      if (!res.ok) return;
+      const data = await res.json();
+      setReceivedBudget(Number(data.received_budget || 0));
+      setUsedBudget(Number(data.used_budget || 0));
+      setProjection(Number(data.projection || 0));
+    } catch { /* ignore */ }
+  };
+
+  const saveBudget = async (field, value) => {
+    setSavingBudget(true);
+    try {
+      const body = { [field]: value };
+      const res = await fetch('http://localhost:2800/api/auth/budget/', { method: 'PUT', headers: authHeaders(), body: JSON.stringify(body) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update budget');
+      setPopupMessage('Budget updated');
+      setPopupType('update');
+      // refresh from server to avoid drift
+      loadBudget();
+    } catch (e) {
+      setPopupMessage(e.message || 'Budget update failed');
+      setPopupType('delete');
+    } finally { setSavingBudget(false); }
+  };
+
+  const fetchApprovedPlans = async () => {
+    try {
+      const res = await fetch('http://localhost:2800/api/auth/approved-plans/', { headers: authHeaders() });
+      if (!res.ok) { setApprovedPlans([]); return; }
+      const data = await res.json();
+      setApprovedPlans(Array.isArray(data) ? data.filter(p => p.file) : []);
+    } catch { setApprovedPlans([]); }
+  };
+
+  const fetchApprovedStatistics = async () => {
+    try {
+      const res = await fetch('http://localhost:2800/api/auth/approved-statistics/', { headers: authHeaders() });
+      if (!res.ok) { setApprovedStats([]); return; }
+      const data = await res.json();
+      setApprovedStats(Array.isArray(data) ? data.filter(s => s.file) : []);
+    } catch { setApprovedStats([]); }
+  };
+
+  const fetchProcessedPlans = async () => {
+    try {
+      const res = await fetch('http://localhost:2800/api/auth/hod-processed-plans/', { headers: authHeaders() });
+      if (!res.ok) { setReviewedForwardedPlans([]); setRejectedPlans([]); return; }
+      const data = await res.json();
+      setReviewedForwardedPlans(Array.isArray(data.reviewed_plans) ? data.reviewed_plans.filter(p => p.file) : []);
+      setRejectedPlans(Array.isArray(data.rejected_plans) ? data.rejected_plans.filter(p => p.file) : []);
+    } catch { setReviewedForwardedPlans([]); setRejectedPlans([]); }
+  };
+
+  const fetchPendingStatistics = async () => {
+    try {
+      const res = await fetch('http://localhost:2800/api/auth/pending-statistics/', { headers: authHeaders() });
+      const data = await res.json();
+      setStats(Array.isArray(data) ? data.filter(s => s.file) : []);
+    } catch { setStats([]); }
+  };
 
   const fetchDashboardData = async () => {
     try {
@@ -66,18 +123,13 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
   const fetchPendingPlans = async () => {
     try {
       const res = await fetch('http://localhost:2800/api/auth/pending-plans/', {
-        headers: {
-          Authorization: `Token ${localStorage.getItem('token')}`,
-        },
+        headers: { Authorization: `Token ${localStorage.getItem('token')}` },
       });
       const data = await res.json();
       const filteredPlans = Array.isArray(data) ? data.filter(p => p.file) : [];
-      setPlans(filteredPlans);
-      // Set approved plans from the fetched data
-      setApprovedPlans(filteredPlans.filter(p => p.status === 'approved'));
+      setPlans(filteredPlans); // do NOT overwrite approvedPlans here
     } catch {
       setPlans([]);
-      setApprovedPlans([]);
     }
   };
 
@@ -141,20 +193,15 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
       setPopupMessage(data.message || 'Plan approved');
       setPopupType('update');
       setViewPlan(null);
-      fetchDashboardData();
-      fetchPendingPlans();
-      // Optimistic update with duplicate guard
-      setApprovedPlans(prev => {
-        const approved = plans.find(p => p.id === planId) || viewPlan;
-        if (!approved) return prev;
-        const exists = prev.some(pp => pp.id === approved.id);
-        return exists
-          ? prev.map(pp => (pp.id === approved.id ? { ...pp, status: 'approved' } : pp))
-          : [...prev, { ...approved, status: 'approved' }];
-      });
+      // Remove from pending list
       setPlans(prev => prev.filter(p => p.id !== planId));
-      // NEW: refresh approved plans
-      // fetchApprovedPlans();
+      // Optimistic add to approvedPlans
+      setApprovedPlans(prev => {
+        const existing = prev.find(p => p.id === planId);
+        if (existing) return prev;
+        return prev; // HoD does not finalize approval, so no direct move to approved here
+      });
+      fetchProcessedPlans();
     } catch (err) {
       setPopupMessage(err.message || 'Failed to approve plan');
       setPopupType('delete');
@@ -305,95 +352,38 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
             <div className="stat-card" style={{ minHeight: 140 }}>
               <h3>Received Budget</h3>
               <input
-                 type="number"
+                type="number"
                 value={receivedBudget}
-                onChange={(e) => {
-                  const val = Number(e.target.value);
-                  setReceivedBudget(val);
-                  localStorage.setItem('receivedBudget', val);
-                }}
-                onFocus={(e) => {
-                  e.target.style.border = '1px solid #2563eb';
-                  e.target.style.background = '#fff';
-                }}
-                onBlur={(e) => {
-                  e.target.style.border = '1px solid #ddd';
-                  e.target.style.background = '#f9f9f9';
-                }}
-                style={{
-                  fontSize: '1.5rem',
-                  marginBottom: 0,
-                  border: '1px solid #ddd',
-                  background: '#f9f9f9',
-                  width: '100%',
-                  textAlign: 'center',
-                  padding: '1rem',
-                  borderRadius: '4px'
-                }}
+                onChange={(e) => setReceivedBudget(Number(e.target.value))}
+                onBlur={(e) => saveBudget('received_budget', Number(e.target.value))}
+                disabled={savingBudget}
+                style={{ fontSize: '1.3rem', marginBottom: 0, width: '100%', padding: '0.6rem', textAlign: 'center' }}
               />
-              Tsh/=
+              <small>Tsh/=</small>
             </div>
             <div className="stat-card" style={{ minHeight: 140 }}>
               <h3>Used Budget</h3>
               <input
                 type="number"
                 value={usedBudget}
-                onChange={(e) => {
-                  const val = Number(e.target.value);
-                  setUsedBudget(val);
-                  localStorage.setItem('usedBudget', val);
-                }}
-                onFocus={(e) => {
-                  e.target.style.border = '1px solid #2563eb';
-                  e.target.style.background = '#fff';
-                }}
-                onBlur={(e) => {
-                  e.target.style.border = '1px solid #ddd';
-                  e.target.style.background = '#f9f9f9';
-                }}
-                style={{
-                  fontSize: '1.5rem',
-                  marginBottom: 0,
-                  border: '1px solid #ddd',
-                  background: '#f9f9f9',
-                  width: '100%',
-                  textAlign: 'center',
-                  padding: '1rem',
-                  borderRadius: '4px'
-                }}
+                onChange={(e) => setUsedBudget(Number(e.target.value))}
+                onBlur={(e) => saveBudget('used_budget', Number(e.target.value))}
+                disabled={savingBudget}
+                style={{ fontSize: '1.3rem', marginBottom: 0, width: '100%', padding: '0.6rem', textAlign: 'center' }}
               />
-              Tsh/=
+              <small>Tsh/=</small>
             </div>
             <div className="stat-card" style={{ minHeight: 140 }}>
               <h3>Projection</h3>
               <input
                 type="number"
                 value={projection}
-                onChange={(e) => {
-                  const val = Number(e.target.value);
-                  setProjection(val);
-                  localStorage.setItem('projection', val);
-                }}
-                onFocus={(e) => {
-                  e.target.style.border = '1px solid #2563eb';
-                  e.target.style.background = '#fff';
-                }}
-                onBlur={(e) => {
-                  e.target.style.border = '1px solid #ddd';
-                  e.target.style.background = '#f9f9f9';
-                }}
-                style={{
-                  fontSize: '1.5rem',
-                  marginBottom: 0,
-                  border: '1px solid #ddd',
-                  background: '#f9f9f9',
-                  width: '100%',
-                  textAlign: 'center',
-                  padding: '1rem',
-                  borderRadius: '4px'
-                }}
+                onChange={(e) => setProjection(Number(e.target.value))}
+                onBlur={(e) => saveBudget('projection', Number(e.target.value))}
+                disabled={savingBudget}
+                style={{ fontSize: '1.3rem', marginBottom: 0, width: '100%', padding: '0.6rem', textAlign: 'center' }}
               />
-              Tsh/=
+              <small>Tsh/=</small>
             </div>
           </div>
 
@@ -482,19 +472,68 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
 
             {/* NEW: Approved Plans */}
             <div style={{ marginBottom: 12, marginTop: 16 }}>
-              <h4 style={{ marginBottom: 8 }}>Approved Plans</h4>
+              <h4 style={{ marginBottom: 8 }}>Forwarded (Reviewed) Plans</h4>
+              {reviewedForwardedPlans && reviewedForwardedPlans.length ? reviewedForwardedPlans.map(p => (
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                  <div style={{ flex: 1 }}>{p.file.split('/').pop()} (by {p.uploader_name})</div>
+                  <span><span style={{ color: '#2563eb', fontWeight: 700, textTransform: 'capitalize' }}>reviewed</span></span>
+                  <button
+                    style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
+                    onClick={() => setViewPlan(p)}
+                  >
+                    View
+                  </button>
+                </div>
+              )) : <div style={{ color: '#666' }}>No forwarded plans</div>}
+            </div>
+
+            <div style={{ marginBottom: 12, marginTop: 16 }}>
+              <h4 style={{ marginBottom: 8 }}>Rejected Plans</h4>
+              {rejectedPlans && rejectedPlans.length ? rejectedPlans.map(p => (
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                  <div style={{ flex: 1 }}>{p.file.split('/').pop()} (by {p.uploader_name})</div>
+                  <span><span style={{ color: '#dc3545', fontWeight: 700, textTransform: 'capitalize' }}>rejected</span></span>
+                  <button
+                    style={{ background: '#dc3545', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
+                    onClick={() => setViewPlan(p)}
+                  >
+                    View
+                  </button>
+                </div>
+              )) : <div style={{ color: '#666' }}>No rejected plans</div>}
+            </div>
+
+            <div style={{ marginBottom: 12, marginTop: 16 }}>
+              <h4 style={{ marginBottom: 8 }}>Approved Plans (Final)</h4>
               {approvedPlans && approvedPlans.length ? approvedPlans.map(p => (
                 <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
                   <div style={{ flex: 1 }}>{p.file.split('/').pop()} (by {p.uploader_name})</div>
                   <span><span style={{ color: '#10b981', fontWeight: 700, textTransform: 'capitalize' }}>approved</span></span>
                   <button
-                    style={{ background: '#28a745', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
+                    style={{ background: '#10b981', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
                     onClick={() => setViewPlan(p)}
                   >
                     View
                   </button>
                 </div>
               )) : <div style={{ color: '#666' }}>No approved plans</div>}
+            </div>
+
+            {/* NEW: Approved Statistics */}
+            <div style={{ marginBottom: 12, marginTop: 16 }}>
+              <h4 style={{ marginBottom: 8 }}>Approved Statistics</h4>
+              {approvedStats && approvedStats.length ? approvedStats.map(s => (
+                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                  <div style={{ flex: 1 }}>{s.file.split('/').pop()} (by {s.uploader_name})</div>
+                  <span><span style={{ color: '#10b981', fontWeight: 700, textTransform: 'capitalize' }}>approved</span></span>
+                  <button
+                    style={{ background: '#10b981', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
+                    onClick={() => setViewStat(s)}
+                  >
+                    View
+                  </button>
+                </div>
+              )) : <div style={{ color: '#666' }}>No approved statistics</div>}
             </div>
 
             {/* Statistics to approve */}

@@ -16,6 +16,8 @@ const HeadOfDivisionDashboard = ({ user, onLogout }) => {
   const [viewStat, setViewStat] = useState(null);
   // NEW: approved plans
   const [approvedPlans, setApprovedPlans] = useState([]);
+  // NEW: approved statistics
+  const [approvedStats, setApprovedStats] = useState([]);
 
   const navigate = useNavigate();
 
@@ -29,42 +31,94 @@ const HeadOfDivisionDashboard = ({ user, onLogout }) => {
       const data = await res.json();
       setApprovedPlans(Array.isArray(data) ? data.filter(p => p.file) : []);
     } catch {
-      setApprovedPlans(plans.filter?.(p => p.status === 'approved') || []);
+      // keep previous approvedPlans on failure
     }
-  }, [plans]);
+  }, []); // removed dependency on plans to avoid recreation loop
 
-  // Add budget states
-  const [receivedBudget, setReceivedBudget] = useState(100000000);
-  const [usedBudget, setUsedBudget] = useState(32000000);
-  const [projection, setProjection] = useState(200000000);
+  const fetchPendingStatistics = React.useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:2800/api/auth/pending-statistics/', {
+        headers: { Authorization: `Token ${localStorage.getItem('token')}` },
+      });
+      const data = await res.json();
+      setStats(Array.isArray(data) ? data.filter(s => s.file) : []);
+    } catch {
+      setStats([]);
+    }
+  }, []);
+
+  const fetchApprovedStatistics = React.useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:2800/api/auth/approved-statistics/', {
+        headers: { Authorization: `Token ${localStorage.getItem('token')}` },
+      });
+      const data = await res.json();
+      setApprovedStats(Array.isArray(data) ? data.filter(s => s.file) : []);
+    } catch {
+      setApprovedStats([]);
+    }
+  }, []);
+
+  // Add budget states (backend-driven instead of static constants)
+  const [receivedBudget, setReceivedBudget] = useState(0);
+  const [usedBudget, setUsedBudget] = useState(0);
+  const [projection, setProjection] = useState(0);
+  const [savingBudget, setSavingBudget] = useState(false);
+
+  const authHeaders = () => ({
+    Authorization: `Token ${localStorage.getItem('token')}`,
+    'Content-Type': 'application/json'
+  });
+
+  const loadBudget = async () => {
+    try {
+      const res = await fetch('http://localhost:2800/api/auth/budget/', { headers: authHeaders() });
+      if (!res.ok) return;
+      const data = await res.json();
+      setReceivedBudget(Number(data.received_budget || 0));
+      setUsedBudget(Number(data.used_budget || 0));
+      setProjection(Number(data.projection || 0));
+    } catch { /* ignore */ }
+  };
+
+  const saveBudget = async (field, value) => {
+    setSavingBudget(true);
+    try {
+      const body = { [field]: value };
+      const res = await fetch('http://localhost:2800/api/auth/budget/', { method: 'PUT', headers: authHeaders(), body: JSON.stringify(body) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update budget');
+      setPopupMessage('Budget updated');
+      setPopupType('update');
+      loadBudget();
+    } catch (e) {
+      setPopupMessage(e.message || 'Budget update failed');
+      setPopupType('delete');
+    } finally { setSavingBudget(false); }
+  };
 
   useEffect(() => {
+    // Initial load only (no popupMessage dependency to prevent continuous refetch)
     fetchDashboardData();
     fetchPendingPlans();
-    // fetch statistics pending for HoD
-    (async () => {
-      try {
-        const res = await fetch('http://localhost:2800/api/auth/pending-statistics/', {
-          headers: { Authorization: `Token ${localStorage.getItem('token')}` },
-        });
-        const data = await res.json();
-        setStats(Array.isArray(data) ? data.filter(s => s.file) : []);
-      } catch {
-        setStats([]);
-      }
-    })();
+    fetchPendingStatistics();
     fetchApprovedPlans();
-  }, [popupMessage, fetchApprovedPlans]);
+    fetchApprovedStatistics();
+    loadBudget();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchApprovedPlans, fetchPendingStatistics, fetchApprovedStatistics]);
 
-  // Add useEffect to load budgets from localStorage
+  // Optional: Refresh lists only when an approval/rejection just succeeded
   useEffect(() => {
-    const rb = localStorage.getItem('receivedBudget') || 100000000;
-    setReceivedBudget(Number(rb));
-    const ub = localStorage.getItem('usedBudget') || 32000000;
-    setUsedBudget(Number(ub));
-    const pr = localStorage.getItem('projection') || 200000000;
-    setProjection(Number(pr));
-  }, []);
+    if (!popupMessage) return;
+    const lower = popupMessage.toLowerCase();
+    if (lower.includes('plan') || lower.includes('statistic')) {
+      // refresh affected resources once
+      fetchPendingPlans();
+      fetchPendingStatistics();
+      fetchApprovedPlans();
+    }
+  }, [popupMessage, fetchApprovedPlans, fetchPendingStatistics]);
 
   const fetchDashboardData = async () => {
     try {
@@ -152,19 +206,14 @@ const HeadOfDivisionDashboard = ({ user, onLogout }) => {
       setPopupMessage(data.message || 'Plan approved');
       setPopupType('update');
       setViewPlan(null);
-      fetchDashboardData();
-      fetchPendingPlans();
-      // Optimistic update with duplicate guard
-      setApprovedPlans(prev => {
-        const approved = plans.find(p => p.id === planId) || viewPlan;
-        if (!approved) return prev;
-        const exists = prev.some(pp => pp.id === approved.id);
-        return exists
-          ? prev.map(pp => (pp.id === approved.id ? { ...pp, status: 'approved' } : pp))
-          : [...prev, { ...approved, status: 'approved' }];
-      });
+      // Optimistic local update
       setPlans(prev => prev.filter(p => p.id !== planId));
-      fetchApprovedPlans();
+      setApprovedPlans(prev => {
+        const existing = prev.find(p => p.id === planId);
+        if (existing) return prev;
+        const original = plans.find(p => p.id === planId) || viewPlan;
+        return original ? [...prev, { ...original, status: 'approved' }] : prev;
+      });
     } catch (err) {
       setPopupMessage(err.message || 'Failed to approve plan');
       setPopupType('delete');
@@ -186,8 +235,7 @@ const HeadOfDivisionDashboard = ({ user, onLogout }) => {
       setPopupMessage(data.message || 'Plan rejected');
       setPopupType('delete');
       setViewPlan(null);
-      fetchDashboardData();
-      fetchPendingPlans();
+      setPlans(prev => prev.filter(p => p.id !== planId));
     } catch (err) {
       setPopupMessage(err.message || 'Failed to reject plan');
       setPopupType('delete');
@@ -209,19 +257,7 @@ const HeadOfDivisionDashboard = ({ user, onLogout }) => {
       setPopupMessage(data.message || 'Statistic approved');
       setPopupType('update');
       setViewStat(null);
-      fetchDashboardData();
-      // refresh lists
-      (async () => {
-        try {
-          const r2 = await fetch('http://localhost:2800/api/auth/pending-statistics/', {
-            headers: { Authorization: `Token ${localStorage.getItem('token')}` },
-          });
-          const d2 = await r2.json(); // FIX: read JSON once
-          setStats(Array.isArray(d2) ? d2.filter(s => s.file) : []);
-        } catch {
-          // Ignore errors while fetching statistics
-        }
-      })();
+      setStats(prev => prev.filter(s => s.id !== statId));
     } catch (err) {
       setPopupMessage(err.message || 'Failed to approve statistic');
       setPopupType('delete');
@@ -243,18 +279,7 @@ const HeadOfDivisionDashboard = ({ user, onLogout }) => {
       setPopupMessage(data.message || 'Statistic rejected');
       setPopupType('delete');
       setViewStat(null);
-      // refresh
-      (async () => {
-        try {
-          const r2 = await fetch('http://localhost:2800/api/auth/pending-statistics/', {
-            headers: { Authorization: `Token ${localStorage.getItem('token')}` },
-          });
-          const d2 = await r2.json(); // FIX: read JSON once
-          setStats(Array.isArray(d2) ? d2.filter(s => s.file) : []);
-        } catch {
-          // Ignore errors while fetching statistics
-        }
-      })();
+      setStats(prev => prev.filter(s => s.id !== statId));
     } catch (err) {
       setPopupMessage(err.message || 'Failed to reject statistic');
       setPopupType('delete');
@@ -297,11 +322,8 @@ const HeadOfDivisionDashboard = ({ user, onLogout }) => {
             <p>Welcome Head of Division. Here you can manage your tasks, view statistics, approve plans/statistics, and access planning tools.</p>
           </div>
 
-          <div className="stats">
-            <div className="stat-card">
-              <h3>My Tasks</h3>
-              <p>{dashboardData?.my_tasks || 0}</p>
-            </div>
+          {/* FIX malformed stats container */}
+          <div className="stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1.2rem', marginBottom: '2.0rem' }}>
             <div className="stat-card">
               <h3>Completed</h3>
               <p>{dashboardData?.completed_tasks || 0}</p>
@@ -310,24 +332,20 @@ const HeadOfDivisionDashboard = ({ user, onLogout }) => {
               <h3>Pending</h3>
               <p>{dashboardData?.pending_tasks || 0}</p>
             </div>
-            {/* Budget Cards as labels */}
-            <div className="stat-card" style={{ minHeight: 120 }}>
+            <div className="stat-card" style={{ minHeight: 140 }}>
               <h3>Received Budget</h3>
-              <p style={{ fontSize: '2.2rem', marginBottom: 0 }}>
-                {receivedBudget.toLocaleString()}Tsh/=
-              </p>
+              <input type="number" value={receivedBudget} onChange={(e)=>setReceivedBudget(Number(e.target.value))} onBlur={(e)=>saveBudget('received_budget', Number(e.target.value))} disabled={savingBudget} style={{ fontSize: '1.1rem', marginBottom: 0, width: '100%', padding: '0.5rem', textAlign: 'center' }} />
+              <small>Tsh/=</small>
             </div>
-            <div className="stat-card" style={{ minHeight: 120 }}>
+            <div className="stat-card" style={{ minHeight: 140 }}>
               <h3>Used Budget</h3>
-              <p style={{ fontSize: '2.2rem', marginBottom: 0 }}>
-                {usedBudget.toLocaleString()}Tsh/=
-              </p>
+              <input type="number" value={usedBudget} onChange={(e)=>setUsedBudget(Number(e.target.value))} onBlur={(e)=>saveBudget('used_budget', Number(e.target.value))} disabled={savingBudget} style={{ fontSize: '1.1rem', marginBottom: 0, width: '100%', padding: '0.5rem', textAlign: 'center' }} />
+              <small>Tsh/=</small>
             </div>
-            <div className="stat-card" style={{ minHeight: 120 }}>
+            <div className="stat-card" style={{ minHeight: 140 }}>
               <h3>Projection</h3>
-              <p style={{ fontSize: '1.9rem', marginBottom: 0 }}>
-                {projection.toLocaleString()}Tsh/=
-              </p>
+              <input type="number" value={projection} onChange={(e)=>setProjection(Number(e.target.value))} onBlur={(e)=>saveBudget('projection', Number(e.target.value))} disabled={savingBudget} style={{ fontSize: '1.1rem', marginBottom: 0, width: '100%', padding: '0.5rem', textAlign: 'center' }} />
+              <small>Tsh/=</small>
             </div>
           </div>
 
@@ -421,6 +439,25 @@ const HeadOfDivisionDashboard = ({ user, onLogout }) => {
                   </button>
                 </div>
               )) : <div style={{ color: '#666' }}>No approved plans</div>}
+            </div>
+
+            {/* NEW: Approved Statistics */}
+            <div style={{ marginBottom: 12, marginTop: 16 }}>
+              <h4 style={{ marginBottom: 8 }}>Approved Statistics</h4>
+              {approvedStats && approvedStats.length ? approvedStats.map(s => (
+                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    {s.file.split('/').pop()} (by {s.uploader_name})
+                  </div>
+                  <span><span style={{ color: '#10b981', fontWeight: 700, textTransform: 'capitalize' }}>approved</span></span>
+                  <button
+                    style={{ background: '#28a745', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
+                    onClick={() => setViewStat(s)}
+                  >
+                    View
+                  </button>
+                </div>
+              )) : <div style={{ color: '#666' }}>No approved statistics</div>}
             </div>
 
             {/* Statistics to approve */}

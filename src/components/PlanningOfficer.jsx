@@ -16,10 +16,23 @@ const PlanningDashboard = ({ user, onLogout }) => {
   const [showCreateDropdown, setShowCreateDropdown] = useState(false);
   const [selectedPlanType, setSelectedPlanType] = useState('');
 
-  // Add budget states
-  const [receivedBudget, setReceivedBudget] = useState(100000000);
-  const [usedBudget, setUsedBudget] = useState(32000000);
-  const [projection, setProjection] = useState(200000000);
+  // Add budget states (backend read-only display)
+  const [receivedBudget, setReceivedBudget] = useState(0);
+  const [usedBudget, setUsedBudget] = useState(0);
+  const [projection, setProjection] = useState(0);
+
+  const loadBudget = async () => {
+    try {
+      const res = await fetch('http://localhost:2800/api/auth/budget/', { headers: { Authorization: `Token ${localStorage.getItem('token')}` } });
+      if (!res.ok) return;
+      const data = await res.json();
+      setReceivedBudget(Number(data.received_budget || 0));
+      setUsedBudget(Number(data.used_budget || 0));
+      setProjection(Number(data.projection || 0));
+    } catch { /* ignore */ }
+  };
+
+  useEffect(() => { loadBudget(); }, []);
 
   // Fetch pending plans for head_of_division
   useEffect(() => {
@@ -101,16 +114,6 @@ const PlanningDashboard = ({ user, onLogout }) => {
       fetchRecentActivities();
     }
   }, [user, refreshKey]); // Add refreshKey to dependencies
-
-  // Add useEffect to load budgets from localStorage
-  useEffect(() => {
-    const rb = localStorage.getItem('receivedBudget') || 100000000;
-    setReceivedBudget(Number(rb));
-    const ub = localStorage.getItem('usedBudget') || 32000000;
-    setUsedBudget(Number(ub));
-    const pr = localStorage.getItem('projection') || 200000000;
-    setProjection(Number(pr));
-  }, []);
 
   const handleLogout = async () => {
     localStorage.removeItem('token');

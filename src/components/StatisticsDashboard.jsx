@@ -1,14 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { api } from '../utils/api';
 import './UserDashboard.css';
 import { useNavigate } from 'react-router-dom';
 import zafiriLogo from '../assets/zafiri.png';
+import Chart from 'chart.js/auto'; // Add at the top
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 const StatisticsDashboard = ({ user, onLogout }) => {
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [popupMessage, setPopupMessage] = useState('');
-  const [popupType] = useState('update');
 
   const stored = JSON.parse(localStorage.getItem('user') || 'null');
   const [profileState, setProfileState] = useState(stored);
@@ -16,25 +17,23 @@ const StatisticsDashboard = ({ user, onLogout }) => {
   // Add upload + my stats state
   const [refreshKey, setRefreshKey] = useState(0);
   const [myStats, setMyStats] = useState([]);
-  const fileInputId = 'stat-upload-input';
+  const fileInputRef = useRef(null);
+
+  // Statistics approvals
+  const [pendingStats, setPendingStats] = useState([]);
+  const [approvedStats, setApprovedStats] = useState([]);
 
   const [filePreview, setFilePreview] = useState(null);
   const [fileName, setFileName] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
 
-  // Add localStorageOptions state
-  const [localStorageOptions, setLocalStorageOptions] = useState(() => {
-    const stored = localStorage.getItem('createdStatistics');
-    return stored ? JSON.parse(stored) : [];
-  });
-
   const navigate = useNavigate();
 
   // Add budget states
-  const [receivedBudget, setReceivedBudget] = useState(100000000);
-  const [usedBudget, setUsedBudget] = useState(32000000);
-  const [projection, setProjection] = useState(200000000);
+  const [receivedBudget, setReceivedBudget] = useState(0);
+  const [usedBudget, setUsedBudget] = useState(0);
+  const [projection, setProjection] = useState(0);
 
   const handleSidebarNav = (route) => {
     navigate(route);
@@ -57,14 +56,27 @@ const StatisticsDashboard = ({ user, onLogout }) => {
     // eslint-disable-next-line
   }, [profileState, refreshKey]);
 
-  // Add useEffect to load budgets from localStorage
+  // Remove localStorage budget loader and use backend instead
+  // Load budgets from backend
+  const loadBudget = async () => {
+    try {
+      const res = await fetch('http://localhost:2800/api/auth/budget/', {
+        headers: { Authorization: `Token ${localStorage.getItem('token')}` }
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setReceivedBudget(Number(data.received_budget || 0));
+      setUsedBudget(Number(data.used_budget || 0));
+      setProjection(Number(data.projection || 0));
+    } catch { /* ignore */ }
+  };
+
   useEffect(() => {
-    const rb = localStorage.getItem('receivedBudget') || 100000000;
-    setReceivedBudget(Number(rb));
-    const ub = localStorage.getItem('usedBudget') || 32000000;
-    setUsedBudget(Number(ub));
-    const pr = localStorage.getItem('projection') || 200000000;
-    setProjection(Number(pr));
+    loadBudget();
+    const onFocus = () => loadBudget();
+    window.addEventListener('focus', onFocus);
+    const t = setInterval(loadBudget, 5000);
+    return () => { clearInterval(t); window.removeEventListener('focus', onFocus); };
   }, []);
 
   // Fetch my statistics (for pending on statistics officer)
@@ -84,6 +96,44 @@ const StatisticsDashboard = ({ user, onLogout }) => {
     load();
   }, [refreshKey]);
 
+  // Fetch pending statistics for approval (for heads)
+  useEffect(() => {
+    const loadPending = async () => {
+      try {
+        const res = await fetch('http://localhost:2800/api/auth/pending-statistics/', {
+          headers: { Authorization: `Token ${localStorage.getItem('token')}` },
+        });
+        if (!res.ok) {
+          console.log('Failed to load pending statistics:', res.status, res.statusText);
+          return;
+        }
+        const data = await res.json();
+        setPendingStats(Array.isArray(data) ? data.filter(s => s.file) : []);
+      } catch (error) {
+        console.log('Error loading pending statistics:', error);
+        setPendingStats([]);
+      }
+    };
+    loadPending();
+  }, [refreshKey]);
+
+  // Fetch approved statistics
+  useEffect(() => {
+    const loadApproved = async () => {
+      try {
+        const res = await fetch('http://localhost:2800/api/auth/approved-statistics/', {
+          headers: { Authorization: `Token ${localStorage.getItem('token')}` },
+        });
+        if (!res.ok) throw new Error('Failed to load approved statistics');
+        const data = await res.json();
+        setApprovedStats(Array.isArray(data) ? data.filter(s => s.file) : []);
+      } catch {
+        setApprovedStats([]);
+      }
+    };
+    loadApproved();
+  }, [refreshKey]);
+
   const fetchDashboardData = async () => {
     try {
       const data = await api.getUserDashboard();
@@ -95,6 +145,7 @@ const StatisticsDashboard = ({ user, onLogout }) => {
         setProfileState(updatedProfile);
         localStorage.setItem('user', JSON.stringify(updatedProfile));
         localStorage.setItem('role', dataRole);
+        console.log('Updated profile with role:', dataRole);
       }
     } catch (error) {
       console.error('Error fetching dashboard:', error);
@@ -118,19 +169,22 @@ const StatisticsDashboard = ({ user, onLogout }) => {
   };
 
   const handleUploadClick = () => {
-    const input = document.getElementById(fileInputId);
-    if (input) input.click();
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''; // reset so same file can be selected again
+      fileInputRef.current.click();
+    }
   };
 
-  const handleFileChange = async (e) => {
-    const f = e.target.files && e.target.files[0];
-    if (!f) return;
-    console.log('File selected:', f.name); // Debug log
-    setSelectedFile(f);
-    setFileName(f.name);
-    setFilePreview(URL.createObjectURL(f));
-    setShowPreview(true);
-    e.target.value = '';
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setSelectedFile(file);
+      setFileName(file.name);
+      setFilePreview(URL.createObjectURL(file));
+      setShowPreview(true);
+      setShowPreview(true);
+      setShowPreview(true);
+    }
   };
 
   const handleCancelUpload = () => {
@@ -144,91 +198,184 @@ const StatisticsDashboard = ({ user, onLogout }) => {
   const [showCreateDropdown, setShowCreateDropdown] = useState(false);
   const [selectedStatType, setSelectedStatType] = useState('');
 
-  // simple toast popup (auto-dismiss)
-  const Popup = ({ message, type = 'update', onClose }) => {
-    useEffect(() => {
-      const t = setTimeout(onClose, 2500);
-      return () => clearTimeout(t);
-    }, [onClose]);
-    const bg = type === 'delete' ? '#dc3545' : '#28a745';
-    return (
-      <div style={{
-        position: 'fixed',
-        top: '30px',
-        right: '30px',
-        background: bg,
-        color: '#fff',
-        padding: '12px 20px',
-        borderRadius: 8,
-        zIndex: 9999,
-        boxShadow: '0 6px 24px rgba(0,0,0,0.15)'
-      }}>
-        {message}
-      </div>
-    );
+  // Add state for viewing statistics
+  const [viewStat, setViewStat] = useState(null);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [selectedReportType, setSelectedReportType] = useState('');
+  const [selectedChartType, setSelectedChartType] = useState('');
+  const [reportData, setReportData] = useState([]);
+  const [reportSummary, setReportSummary] = useState('');
+  const [reportCreated, setReportCreated] = useState(false);
+  const chartRef = useRef(null);
+
+  const handleGenerateReport = () => {
+    setShowReportModal(true);
   };
+
+  const handleReportTypeChange = (type) => {
+    setSelectedReportType(type);
+    // Filter statistics by period
+    const filtered = myStats.filter(s => {
+      const date = new Date(s.uploaded_at);
+      if (type === 'first_quarter') return date.getMonth() < 3;
+      if (type === 'third_quarter') return date.getMonth() >= 6 && date.getMonth() < 9;
+      if (type === 'semi_annual') return date.getMonth() < 6;
+      if (type === 'annual') return true;
+      return true;
+    });
+    setReportData(filtered);
+  };
+
+  const handleChartTypeChange = (type) => {
+    setSelectedChartType(type);
+  };
+
+
+  const handleCreateReport = async () => {
+    // Calculate summary: rising/falling
+    if (!reportData.length) return;
+    // Use a dummy value field, replace with your actual value field
+    const values = reportData.map(s => s.value || 1);
+    let summary = '';
+    if (values.length > 1) {
+      const trend = values[values.length - 1] - values[0];
+      if (trend > 0) summary = 'The statistics are rising over the selected period.';
+      else if (trend < 0) summary = 'The statistics are falling over the selected period.';
+      else summary = 'The statistics are stable over the selected period.';
+    } else {
+      summary = 'Not enough data to determine trend.';
+    }
+    setReportSummary(summary);
+    setReportCreated(true);
+  };
+
+  const handleDownloadPDF = async () => {
+    // Export chart and summary as PDF
+    const input = document.getElementById('report-pdf-content');
+    if (!input) return;
+    const canvas = await html2canvas(input);
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const imgProps = pdf.getImageProperties(imgData);
+    const pdfWidth = pageWidth - 20;
+    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+    pdf.text(`Statistics Report: ${selectedReportType.replace('_', ' ')}`, 10, 10);
+    pdf.addImage(imgData, 'PNG', 10, 20, pdfWidth, pdfHeight);
+    pdf.text(reportSummary, 10, pdfHeight + 30);
+    pdf.save('statistics_report.pdf');
+  };
+
+  // Render chart after selections
+  useEffect(() => {
+    if (selectedChartType && reportData.length && chartRef.current) {
+      // Destroy previous chart instance if exists
+      if (chartRef.current._chartInstance) {
+        chartRef.current._chartInstance.destroy();
+      }
+      // Example: render a bar chart
+      chartRef.current._chartInstance = new Chart(chartRef.current, {
+        type: selectedChartType, // 'bar', 'line', 'pie'
+        data: {
+          labels: reportData.map(s => s.file ? s.file.split('/').pop() : 'Stat'),
+          datasets: [{
+            label: 'Statistics',
+            data: reportData.map(s => s.value || 1), // Replace with actual value field
+            backgroundColor: '#2563eb'
+          }]
+        }
+      });
+    }
+  }, [selectedChartType, reportData]);
 
   const handleConfirmUpload = async () => {
     if (!selectedFile) return;
-    try {
-      const fd = new FormData();
-      fd.append('file', selectedFile);
-      if (selectedStatType) {
-        fd.append('stat_type', selectedStatType);
-      }
-      const res = await fetch('http://localhost:2800/api/auth/upload-statistic/', {
-        method: 'POST',
-        headers: { Authorization: `Token ${localStorage.getItem('token')}` },
-        body: fd,
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Upload failed');
-      setPopupMessage('Data uploaded successfully');
-      setRefreshKey(k => k + 1);
-      // Save to local storage
-      const newOption = { id: Date.now(), type: selectedStatType, file: selectedFile.name, createdAt: new Date().toISOString() };
-      const updatedOptions = [...localStorageOptions, newOption];
-      setLocalStorageOptions(updatedOptions);
-      localStorage.setItem('createdStatistics', JSON.stringify(updatedOptions));
-    } catch (err) {
-      setPopupMessage(err.message || 'Upload failed');
-    } finally {
-      if (filePreview) URL.revokeObjectURL(filePreview);
-      setSelectedFile(null);
-      setFilePreview(null);
-      setFileName('');
-      setSelectedStatType(''); // Reset after upload
-      setShowPreview(false);
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    formData.append('upload_date', new Date().toISOString());
+    if (selectedStatType) {
+      formData.append('stat_type', selectedStatType);
     }
+
+    try {
+      const token = localStorage.getItem('token');
+      const apiUrl = 'http://localhost:2800/api/auth/upload-statistic/';
+      const res = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Token ${token}`,
+        },
+        body: formData,
+      });
+      
+      if (!res.ok) {
+        let errMsg = '';
+        try {
+          const err = await res.json();
+          errMsg = err.error || res.statusText;
+        } catch {
+          errMsg = res.statusText || 'Unknown error';
+        }
+        alert('Upload failed: ' + errMsg);
+        return;
+      }
+      
+      const uploadResult = await res.json();
+      console.log('Upload result:', uploadResult);
+      alert('File uploaded successfully!');
+      
+      // Trigger refresh of activities
+      setRefreshKey(prev => prev + 1);
+      
+    } catch (e) {
+      console.error('Upload error:', e);
+      alert('Upload error: ' + e.message);
+    }
+    if (filePreview) URL.revokeObjectURL(filePreview);
+    setSelectedFile(null);
+    setFilePreview(null);
+    setFileName('');
+    setShowPreview(false);
+    setSelectedStatType(''); // Reset after upload
   };
 
   // Approve statistic handler
   const handleApproveStatisticModal = async (statId) => {
     try {
-      const res = await fetch(`http://localhost:2800/api/auth/approve-statistic/${statId}/`, {
+      const res = await fetch(`http://localhost:2800/api/auth/review-statistic/${statId}/`, {
         method: 'POST',
-        headers: { Authorization: `Token ${localStorage.getItem('token')}` },
+        headers: {
+          Authorization: `Token ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action: 'approve' })
       });
-      if (!res.ok) throw new Error('Failed to approve statistic');
-      setPopupMessage('Statistic approved successfully');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to approve statistic');
+      alert(data.message || 'Statistic approved successfully');
       setRefreshKey(k => k + 1);
     } catch (err) {
-      setPopupMessage(err.message || 'Failed to approve statistic');
+      alert(err.message || 'Failed to approve statistic');
     }
   };
 
   // Reject statistic handler
   const handleRejectStatisticModal = async (statId) => {
     try {
-      const res = await fetch(`http://localhost:2800/api/auth/reject-statistic/${statId}/`, {
+      const res = await fetch(`http://localhost:2800/api/auth/review-statistic/${statId}/`, {
         method: 'POST',
-        headers: { Authorization: `Token ${localStorage.getItem('token')}` },
+        headers: {
+          Authorization: `Token ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action: 'reject' })
       });
-      if (!res.ok) throw new Error('Failed to reject statistic');
-      setPopupMessage('Statistic rejected successfully');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to reject statistic');
+      alert(data.message || 'Statistic rejected successfully');
       setRefreshKey(k => k + 1);
     } catch (err) {
-      setPopupMessage(err.message || 'Failed to reject statistic');
+      alert(err.message || 'Failed to reject statistic');
     }
   };
 
@@ -312,6 +459,13 @@ const StatisticsDashboard = ({ user, onLogout }) => {
     }
   `;
 
+  useEffect(() => {
+    console.log('User object:', user);
+    console.log('User role:', user?.role);
+    console.log('Profile state:', profileState);
+    console.log('Profile state role:', profileState?.role);
+  }, [user, profileState]);
+
   if (loading) {
     return <div className="dashboard-loading">Loading dashboard...</div>;
   }
@@ -322,6 +476,21 @@ const StatisticsDashboard = ({ user, onLogout }) => {
     { title: 'Pending Statistics', value: dashboardData?.pending_statistics || 0 },
     { title: 'Approved Statistics', value: dashboardData?.approved_statistics || 0 },
   ];
+
+  // Button styles
+  const blueBtn = {
+    background: '#2563eb',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '20px',
+    padding: '10px 24px',
+    margin: '8px 8px 0 0',
+    fontWeight: 600,
+    fontSize: '1rem',
+    cursor: 'pointer',
+    transition: 'background 0.2s',
+    boxShadow: '0 2px 8px rgba(37,99,235,0.08)'
+  };
 
   return (
     <>
@@ -355,7 +524,12 @@ const StatisticsDashboard = ({ user, onLogout }) => {
               <p>Welcome Statistics Officer. Here you can manage your statistical data, create reports, and analyze trends.</p>
             </div>
 
-            <div className="stats">
+            <div className="stats-cards" style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: '1.2rem',
+            marginBottom: '2.0rem'
+          }}>
               {statistics.map((stat, idx) => (
                 <div className="stat-card" key={idx}>
                   <h3>{stat.title}</h3>
@@ -365,30 +539,28 @@ const StatisticsDashboard = ({ user, onLogout }) => {
               {/* Budget Cards as labels */}
               <div className="stat-card" style={{ minHeight: 120 }}>
                 <h3>Received Budget</h3>
-                <p style={{ fontSize: '2.2rem', marginBottom: 0 }}>
-                  {receivedBudget.toLocaleString()}Tsh/=
-                </p>
+              <p style={{fontSize: '1.6rem', marginBottom: 0, width: '100%', padding: '0.6rem', textAlign: 'center' }}>
+                {receivedBudget.toLocaleString()}Tsh/=
+              </p>
               </div>
               <div className="stat-card" style={{ minHeight: 120 }}>
                 <h3>Used Budget</h3>
-                <p style={{ fontSize: '2.2rem', marginBottom: 0 }}>
+                <p style={{fontSize: '1.6rem', marginBottom: 0, width: '100%', padding: '0.6rem', textAlign: 'center'}}>
                   {usedBudget.toLocaleString()}Tsh/=
                 </p>
               </div>
               <div className="stat-card" style={{ minHeight: 120 }}>
                 <h3>Projection</h3>
-                <p style={{ fontSize: '1.9rem', marginBottom: 0 }}>
+                <p style={{ fontSize: '1.6rem', marginBottom: 0, width: '100%', padding: '0.6rem', textAlign: 'center'}}>
                   {projection.toLocaleString()}Tsh/=
                 </p>
               </div>
             </div>
 
-            <div className="quick-actions">
+            {/* Action Buttons */}
+            <div style={{ marginTop: '1.5rem' }}>
               <div style={{ position: 'relative', display: 'inline-block' }}>
-                <div className="action-card" onClick={() => setShowCreateDropdown(!showCreateDropdown)} style={{ cursor: 'pointer' }}>
-                  <h4>Create Statistics</h4>
-                  <p>Create and manage your statistical data</p>
-                </div>
+                <button style={blueBtn} onClick={() => setShowCreateDropdown(!showCreateDropdown)}>Create Statistics</button>
                 {showCreateDropdown && (
                   <div style={{
                     position: 'absolute',
@@ -428,11 +600,18 @@ const StatisticsDashboard = ({ user, onLogout }) => {
                   </div>
                 )}
               </div>
-              <div className="action-card" onClick={handleUploadClick} style={{ cursor: 'pointer' }}>
-                <h4>Upload Data</h4>
-                <p>Upload statistical datasets and reports</p>
-              </div>
-              <div className="action-card">
+              <button style={blueBtn} onClick={handleUploadClick}>Upload Statistics</button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                style={{ display: 'none' }}
+                accept=".xlsx,.xls,.doc,.docx,.pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf"
+                onChange={handleFileChange}
+              />
+            </div>
+
+            <div className="quick-actions">
+              <div className="action-card" onClick={handleGenerateReport}>
                 <h4>Generate Reports</h4>
                 <p>Generate comprehensive statistical reports</p>
               </div>
@@ -495,62 +674,256 @@ const StatisticsDashboard = ({ user, onLogout }) => {
               }) : <p>No uploads yet.</p>}
             </div>
 
-            {popupMessage && <Popup message={popupMessage} type={popupType} onClose={() => setPopupMessage('')} />}
+            {/* Approvals section for heads */}
+            {(user?.role === 'head_of_division' || user?.role === 'head_of_department' || user?.role === 'director_general' || profileState?.role === 'head_of_division' || profileState?.role === 'head_of_department' || profileState?.role === 'director_general') && (
+              <div className="approvals-section" style={{ marginTop: 20 }}>
+                <h3 style={{ marginBottom: 10 }}>Statistics Approvals</h3>
+                {((!pendingStats || pendingStats.length === 0) && (!approvedStats || approvedStats.length === 0)) && (
+                  <div style={{ color: '#666', marginBottom: 8 }}>No statistics available for approval.</div>
+                )}
+
+                {/* Pending Statistics to approve */}
+                <div style={{ marginBottom: 12 }}>
+                  <h4 style={{ marginBottom: 8 }}>Pending Statistics</h4>
+                  {pendingStats && pendingStats.length ? pendingStats.map(s => {
+                    const status = s.status || 'pending';
+                    const statusColor = status === 'rejected' ? '#ef4444'
+                      : status === 'approved' ? '#10b981'
+                      : status === 'reviewed' ? '#2563eb'
+                      : '#f59e0b';
+                    const viewBg = status === 'rejected' ? '#dc3545'
+                      : status === 'reviewed' || status === 'approved' ? '#28a745'
+                      : '#2563eb';
+                    return (
+                      <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                        <div style={{ flex: 1 }}>
+                          {s.file.split('/').pop()} (by {s.uploader_name})
+                        </div>
+                        <span style={{ color: statusColor, fontWeight: 700, textTransform: 'capitalize' }}>{status}</span>
+                        <button
+                          style={{ background: viewBg, color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
+                          onClick={() => setViewStat(s)}
+                        >
+                          View
+                        </button>
+                      </div>
+                    );
+                  }) : <div style={{ color: '#666' }}>No pending statistics</div>}
+                </div>
+
+                {/* Approved Statistics */}
+                <div style={{ marginBottom: 12, marginTop: 16 }}>
+                  <h4 style={{ marginBottom: 8 }}>Approved Statistics</h4>
+                  {approvedStats && approvedStats.length ? approvedStats.map(s => (
+                    <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                      <div style={{ flex: 1 }}>
+                        {s.file.split('/').pop()} (by {s.uploader_name})
+                      </div>
+                      <span style={{ color: '#10b981', fontWeight: 700, textTransform: 'capitalize' }}>approved</span>
+                      <button
+                        style={{ background: '#28a745', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
+                        onClick={() => setViewStat(s)}
+                      >
+                        View
+                      </button>
+                    </div>
+                  )) : <div style={{ color: '#666' }}>No approved statistics</div>}
+                </div>
+              </div>
+            )}
+
+            {/* Modal for statistic view/approve/reject */}
+            {viewStat && (
+              <div style={{
+                position: 'fixed',
+                top: 0, left: 0, right: 0, bottom: 0,
+                background: 'rgba(0,0,0,0.35)',
+                zIndex: 9999,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <div style={{
+                  background: '#fff',
+                  borderRadius: 12,
+                  padding: 32,
+                  minWidth: '60vw',
+                  maxWidth: '60vw',
+                  minHeight: '60vh',
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+                  position: 'relative',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between'
+                }}>
+                  <h3 style={{ marginTop: 0, marginBottom: 18 }}>
+                    {viewStat.file.split('/').pop()} (by {viewStat.uploader_name})
+                  </h3>
+                  <iframe
+                    src={`http://localhost:2800/media/${viewStat.file}`}
+                    title="Statistic Document"
+                    style={{
+                      width: '100%',
+                      height: '50vh',
+                      border: 'none',
+                      marginBottom: 16,
+                      background: '#f8f9fc'
+                    }}
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                    <button
+                      style={{ background: '#28a745', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 6, fontWeight: 600, fontSize: '1rem', cursor: 'pointer' }}
+                      onClick={() => handleApproveStatisticModal(viewStat.id)}
+                    >
+                      Approve
+                    </button>
+                    <button
+                      style={{ background: '#dc3545', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 6, fontWeight: 600, fontSize: '1rem', cursor: 'pointer' }}
+                      onClick={() => handleRejectStatisticModal(viewStat.id)}
+                    >
+                      Reject
+                    </button>
+                    <button
+                      style={{ background: '#888', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 6, fontWeight: 600, fontSize: '1rem', cursor: 'pointer' }}
+                      onClick={() => setViewStat(null)}
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Preview Modal for Upload */}
+            {showPreview && (
+              <div style={{
+                position: 'fixed',
+                top: 0, left: 0, right: 0, bottom: 0,
+                background: 'rgba(0,0,0,0.35)',
+                zIndex: 9999,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <div style={{
+                  background: '#fff',
+                  borderRadius: 12,
+                  padding: 32,
+                  minWidth: '60vw',
+                  maxWidth: '60vw',
+                  minHeight: '70vh', // Increased for better preview space
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+                  position: 'relative',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between'
+                }}>
+                  <h3 style={{ marginTop: 0, marginBottom: 18 }}>Preview Document</h3>
+                  {renderFilePreview()}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                    <button
+                      style={{ ...blueBtn, background: '#2563eb' }}
+                      onClick={handleConfirmUpload}
+                    >
+                      Upload
+                    </button>
+                    <button
+                      style={{ ...blueBtn, background: '#dc3545' }}
+                      onClick={handleCancelUpload}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Report Generation Modal */}
+            {showReportModal && (
+              <div className="modal" style={{
+                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                background: 'rgba(0,0,0,0.35)', zIndex: 9999,
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
+                <div style={{
+                  background: '#fff', borderRadius: 12, padding: 32,
+                  minWidth: '40vw', maxWidth: '60vw', minHeight: '40vh',
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.18)', position: 'relative'
+                }}>
+                  <h3 style={{ marginTop: 0, marginBottom: 18 }}>Generate Report</h3>
+                  <div style={{ marginBottom: 16 }}>
+                    <label>Report Period:&nbsp;</label>
+                    <select value={selectedReportType} onChange={e => handleReportTypeChange(e.target.value)}>
+                      <option value="">Select period</option>
+                      <option value="first_quarter">First Quarter</option>
+                      <option value="third_quarter">Third Quarter</option>
+                      <option value="semi_annual">Semi Annual</option>
+                      <option value="annual">Annual</option>
+                    </select>
+                  </div>
+                  <div style={{ marginBottom: 16 }}>
+                    <label>Chart Type:&nbsp;</label>
+                    <select value={selectedChartType} onChange={e => handleChartTypeChange(e.target.value)}>
+                      <option value="">Select chart</option>
+                      <option value="bar">Bar Chart</option>
+                      <option value="line">Line Graph</option>
+                      <option value="pie">Histogram</option>
+                    </select>
+                  </div>
+                  <div style={{ marginBottom: 16 }}>
+                    <canvas ref={chartRef} width={600} height={400}></canvas>
+                  </div>
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    <button style={blueBtn} onClick={handleCreateReport}>Create Report</button>
+                    <button style={{ ...blueBtn, background: '#dc3545' }} onClick={() => setShowReportModal(false)}>Close</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Report PDF Modal */}
+            {reportCreated && (
+              <div id="report-pdf-content" style={{
+                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                background: 'rgba(255,255,255,0.9)', zIndex: 9999,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                padding: 20, overflow: 'auto'
+              }}>
+                <div style={{
+                  background: '#fff', borderRadius: 12, padding: 32,
+                  minWidth: '40vw', maxWidth: '60vw', minHeight: '40vh',
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.18)', position: 'relative'
+                }}>
+                  <h3 style={{ marginTop: 0, marginBottom: 18 }}>Statistics Report</h3>
+                  <div style={{ marginBottom: 16 }}>
+                    <strong>Period:</strong> {selectedReportType.replace('_', ' ')}
+                  </div>
+                  <div style={{ marginBottom: 16 }}>
+                    <strong>Summary:</strong> {reportSummary}
+                  </div>
+                  <div style={{ marginBottom: 16 }}>
+                    <canvas ref={chartRef} width={600} height={400}></canvas>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                    <button
+                      style={{ ...blueBtn, background: '#28a745' }}
+                      onClick={handleDownloadPDF}
+                    >
+                      Download PDF
+                    </button>
+                    <button
+                      style={{ ...blueBtn, background: '#dc3545' }}
+                      onClick={() => setReportCreated(false)}
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
-
-      <input
-        id={fileInputId}
-        type="file"
-        accept=".xlsx,.xls,.doc,.docx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        onChange={handleFileChange}
-        style={{ display: 'none' }}
-      />
-
-      {/* Preview Modal */}
-      {showPreview && (
-        <div style={{
-          position: 'fixed',
-          top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.35)',
-          zIndex: 9999,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <div style={{
-            background: '#fff',
-            borderRadius: 12,
-            padding: 32,
-            minWidth: '60vw',
-            maxWidth: '60vw',
-            minHeight: '70vh',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-            position: 'relative',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between'
-          }}>
-            <h3 style={{ marginTop: 0, marginBottom: 18 }}>Preview Document</h3>
-            {renderFilePreview()}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-              <button
-                style={{ background: '#28a745', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 6, fontWeight: 600, cursor: 'pointer' }}
-                onClick={handleConfirmUpload}
-              >
-                Upload
-              </button>
-              <button
-                style={{ background: '#dc3545', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 6, fontWeight: 600, cursor: 'pointer' }}
-                onClick={handleCancelUpload}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 };

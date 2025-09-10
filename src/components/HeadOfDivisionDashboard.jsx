@@ -63,7 +63,8 @@ const HeadOfDivisionDashboard = ({ user, onLogout }) => {
   const [receivedBudget, setReceivedBudget] = useState(0);
   const [usedBudget, setUsedBudget] = useState(0);
   const [projection, setProjection] = useState(0);
-  const [savingBudget, setSavingBudget] = useState(false);
+  // removed editing states; HoD is read-only for budget
+  // const [savingBudget, setSavingBudget] = useState(false);
 
   const authHeaders = () => ({
     Authorization: `Token ${localStorage.getItem('token')}`,
@@ -81,21 +82,8 @@ const HeadOfDivisionDashboard = ({ user, onLogout }) => {
     } catch { /* ignore */ }
   };
 
-  const saveBudget = async (field, value) => {
-    setSavingBudget(true);
-    try {
-      const body = { [field]: value };
-      const res = await fetch('http://localhost:2800/api/auth/budget/', { method: 'PUT', headers: authHeaders(), body: JSON.stringify(body) });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to update budget');
-      setPopupMessage('Budget updated');
-      setPopupType('update');
-      loadBudget();
-    } catch (e) {
-      setPopupMessage(e.message || 'Budget update failed');
-      setPopupType('delete');
-    } finally { setSavingBudget(false); }
-  };
+  // removed saveBudget since HoD cannot edit budget
+  // const saveBudget = async (field, value) => { /* removed */ };
 
   useEffect(() => {
     // Initial load only (no popupMessage dependency to prevent continuous refetch)
@@ -323,7 +311,12 @@ const HeadOfDivisionDashboard = ({ user, onLogout }) => {
           </div>
 
           {/* FIX malformed stats container */}
-          <div className="stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1.2rem', marginBottom: '2.0rem' }}>
+          <div className="stats-cards" style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: '1.2rem',
+            marginBottom: '2.0rem'
+          }}>
             <div className="stat-card">
               <h3>Completed</h3>
               <p>{dashboardData?.completed_tasks || 0}</p>
@@ -332,20 +325,18 @@ const HeadOfDivisionDashboard = ({ user, onLogout }) => {
               <h3>Pending</h3>
               <p>{dashboardData?.pending_tasks || 0}</p>
             </div>
+            {/* Budget cards are read-only for HoD */}
             <div className="stat-card" style={{ minHeight: 140 }}>
               <h3>Received Budget</h3>
-              <input type="number" value={receivedBudget} onChange={(e)=>setReceivedBudget(Number(e.target.value))} onBlur={(e)=>saveBudget('received_budget', Number(e.target.value))} disabled={savingBudget} style={{ fontSize: '1.1rem', marginBottom: 0, width: '100%', padding: '0.5rem', textAlign: 'center' }} />
-              <small>Tsh/=</small>
+              <p style={{ fontSize: '1.9rem', marginBottom: 0 }}>{receivedBudget.toLocaleString()}Tsh/=</p>
             </div>
             <div className="stat-card" style={{ minHeight: 140 }}>
               <h3>Used Budget</h3>
-              <input type="number" value={usedBudget} onChange={(e)=>setUsedBudget(Number(e.target.value))} onBlur={(e)=>saveBudget('used_budget', Number(e.target.value))} disabled={savingBudget} style={{ fontSize: '1.1rem', marginBottom: 0, width: '100%', padding: '0.5rem', textAlign: 'center' }} />
-              <small>Tsh/=</small>
+              <p style={{ fontSize: '1.9rem', marginBottom: 0 }}>{usedBudget.toLocaleString()}Tsh/=</p>
             </div>
             <div className="stat-card" style={{ minHeight: 140 }}>
               <h3>Projection</h3>
-              <input type="number" value={projection} onChange={(e)=>setProjection(Number(e.target.value))} onBlur={(e)=>saveBudget('projection', Number(e.target.value))} disabled={savingBudget} style={{ fontSize: '1.1rem', marginBottom: 0, width: '100%', padding: '0.5rem', textAlign: 'center' }} />
-              <small>Tsh/=</small>
+              <p style={{ fontSize: '1.9rem', marginBottom: 0 }}>{projection.toLocaleString()}Tsh/=</p>
             </div>
           </div>
 

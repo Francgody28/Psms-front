@@ -264,7 +264,7 @@ const PlanningDashboard = ({ user, onLogout }) => {
           <ul>
             <li onClick={() => handleSidebarNav('/dashboard')}>Dashboard</li>
             <li onClick={() => handleSidebarNav('/statistics-dashboard')}>Statistics</li>
-            <li className="active" onClick={() => handleSidebarNav('/planning-dashboard')}>Plans</li>
+            <li className="active" onClick={() => handleSidebarNav('/planning-dashboard')}>Planning</li>
             <li onClick={handleLogout} style={{ cursor: 'pointer', color: '#fff' }}>Logout</li>
           </ul>
         </nav>

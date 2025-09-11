@@ -472,9 +472,9 @@ const StatisticsDashboard = ({ user, onLogout }) => {
 
   // Statistics-specific data
   const statistics = [
-    { title: 'Total Reports', value: dashboardData?.total_reports || 0 },
-    { title: 'Pending Statistics', value: dashboardData?.pending_statistics || 0 },
-    { title: 'Approved Statistics', value: dashboardData?.approved_statistics || 0 },
+    { title: 'Total Reports', value: dashboardData?.total_reports ?? (myStats.length + pendingStats.length + approvedStats.length) },
+    { title: 'Pending Statistics', value: dashboardData?.pending_statistics ?? pendingStats.length },
+    { title: 'Approved Statistics', value: dashboardData?.approved_statistics ?? approvedStats.length },
   ];
 
   // Button styles

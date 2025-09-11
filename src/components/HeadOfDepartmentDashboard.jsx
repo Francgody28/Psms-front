@@ -298,6 +298,54 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
     }
   };
 
+  // Helper to normalize file URL (avoid double /media/ and ensure presence)
+  const buildFileUrl = (filePath) => {
+    if (!filePath) return '';
+    if (filePath.startsWith('http://') || filePath.startsWith('https://')) return filePath;
+    let fp = filePath.trim();
+    // remove leading duplicate slashes
+    while (fp.startsWith('//')) fp = fp.slice(1);
+    // strip one leading slash for easier checks
+    if (fp.startsWith('/')) fp = fp.slice(1);
+    // if already starts with media/ keep it, else prepend media/
+    if (!fp.startsWith('media/')) fp = `media/${fp}`;
+    // collapse accidental media/media/
+    fp = fp.replace(/media\/media\//g, 'media/');
+    return `http://localhost:2800/${fp}`;
+  };
+
+  // Helper to download file with auth (normalized path)
+  const downloadFile = async (filePath, fileName, id, type='plan') => {
+    try {
+      const endpoint = type === 'plan' ? `download-plan/${id}/` : `download-statistic/${id}/`;
+      const url = id ? `http://localhost:2800/api/auth/${endpoint}` : buildFileUrl(filePath);
+      const res = await fetch(url, { headers: { Authorization: `Token ${localStorage.getItem('token')}` } });
+      if (!res.ok) {
+        let detail = '';
+        try { detail = await res.json(); } catch { detail = await res.text(); }
+        console.error('Download error', detail);
+        setPopupMessage(detail.error || 'Download failed');
+        setPopupType('delete');
+        return;
+      }
+      const blob = await res.blob();
+      const objUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objUrl;
+      a.download = fileName || filePath.split('/').pop();
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(objUrl);
+      setPopupMessage('Download started');
+      setPopupType('update');
+    } catch (e) {
+      console.error(e);
+      setPopupMessage('Download failed');
+      setPopupType('delete');
+    }
+  };
+
   if (loading) {
     return <div className="dashboard-loading">Loading dashboard...</div>;
   }
@@ -318,7 +366,7 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
             {/* Make Dashboard go home */}
             <li onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>Dashboard</li>
             <li onClick={() => navigate('/statistics-dashboard')} style={{ cursor: 'pointer' }}>Statistics</li>
-            <li onClick={() => navigate('/planning-dashboard')} style={{ cursor: 'pointer' }}>Plans</li>
+            <li onClick={() => navigate('/planning-dashboard')} style={{ cursor: 'pointer' }}>Planning</li>
             <li onClick={handleLogout} style={{ cursor: 'pointer', color: '#fff' }}>Logout</li>
           </ul>
         </nav>
@@ -355,11 +403,26 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
                 type="number"
                 value={receivedBudget}
                 onChange={(e) => setReceivedBudget(Number(e.target.value))}
-                onBlur={(e) => saveBudget('received_budget', Number(e.target.value))}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#ccc';
+                  saveBudget('received_budget', Number(e.target.value));
+                }}
                 disabled={savingBudget}
-                style={{ fontSize: '1.3rem', marginBottom: 0, width: '100%', padding: '0.6rem', textAlign: 'center' }}
+                style={{
+                  fontSize: '1.3rem',
+                  marginBottom: '0.5rem',
+                  width: '100%',
+                  padding: '0.6rem',
+                  textAlign: 'center',
+                  border: '1px solid #ccc',
+                  borderRadius: '6px',
+                  outline: 'none',
+                  transition: 'border-color 0.3s',
+                  backgroundColor: savingBudget ? '#f5f5f5' : '#fff'
+                }}
+                onFocus={(e) => e.target.style.borderColor = '#2563eb'}
               />
-              <small>Tsh/=</small>
+              <small style={{ color: '#666', fontSize: '0.9rem' }}>Tsh/=</small>
             </div>
             <div className="stat-card" style={{ minHeight: 140 }}>
               <h3>Used Budget</h3>
@@ -367,11 +430,26 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
                 type="number"
                 value={usedBudget}
                 onChange={(e) => setUsedBudget(Number(e.target.value))}
-                onBlur={(e) => saveBudget('used_budget', Number(e.target.value))}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#ccc';
+                  saveBudget('used_budget', Number(e.target.value));
+                }}
                 disabled={savingBudget}
-                style={{ fontSize: '1.3rem', marginBottom: 0, width: '100%', padding: '0.6rem', textAlign: 'center' }}
+                style={{
+                  fontSize: '1.3rem',
+                  marginBottom: '0.5rem',
+                  width: '100%',
+                  padding: '0.6rem',
+                  textAlign: 'center',
+                  border: '1px solid #ccc',
+                  borderRadius: '6px',
+                  outline: 'none',
+                  transition: 'border-color 0.3s',
+                  backgroundColor: savingBudget ? '#f5f5f5' : '#fff'
+                }}
+                onFocus={(e) => e.target.style.borderColor = '#2563eb'}
               />
-              <small>Tsh/=</small>
+              <small style={{ color: '#666', fontSize: '0.9rem' }}>Tsh/=</small>
             </div>
             <div className="stat-card" style={{ minHeight: 140 }}>
               <h3>Projection</h3>
@@ -379,11 +457,26 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
                 type="number"
                 value={projection}
                 onChange={(e) => setProjection(Number(e.target.value))}
-                onBlur={(e) => saveBudget('projection', Number(e.target.value))}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#ccc';
+                  saveBudget('projection', Number(e.target.value));
+                }}
                 disabled={savingBudget}
-                style={{ fontSize: '1.3rem', marginBottom: 0, width: '100%', padding: '0.6rem', textAlign: 'center' }}
+                style={{
+                  fontSize: '1.3rem',
+                  marginBottom: '0.5rem',
+                  width: '100%',
+                  padding: '0.6rem',
+                  textAlign: 'center',
+                  border: '1px solid #ccc',
+                  borderRadius: '6px',
+                  outline: 'none',
+                  transition: 'border-color 0.3s',
+                  backgroundColor: savingBudget ? '#f5f5f5' : '#fff'
+                }}
+                onFocus={(e) => e.target.style.borderColor = '#2563eb'}
               />
-              <small>Tsh/=</small>
+              <small style={{ color: '#666', fontSize: '0.9rem' }}>Tsh/=</small>
             </div>
           </div>
 
@@ -443,9 +536,14 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
                   : status === 'approved' ? '#28a745'
                   : '#2563eb'; // blue for reviewed (and default)
                 return (
-                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, border: '1px solid #ddd', padding: 12, borderRadius: 8 }}>
                     <div style={{ flex: 1 }}>
-                      {p.file.split('/').pop()} (by {p.uploader_name})
+                      <div style={{ fontWeight: 'bold', marginBottom: 4 }}>{p.file.split('/').pop()} (by {p.uploader_name})</div>
+                      <div style={{ fontSize: '0.9em', color: '#666' }}>
+                        <div>Uploaded: {p.upload_date ? new Date(p.upload_date).toLocaleString() : 'N/A'}</div>
+                        {p.approved_at_hod && <div>Approved by HoD: {new Date(p.approved_at_hod).toLocaleString()} (by {p.approved_by_hod_username || 'Unknown'})</div>}
+                        <div>Awaiting HoDept Approval</div>
+                      </div>
                     </div>
                     <span
                       style={{
@@ -459,6 +557,12 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
                     >
                       {status}
                     </span>
+                    <button
+                      style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
+                      onClick={() => downloadFile(p.file, p.file.split('/').pop(), p.id, 'plan')}
+                    >
+                      Download
+                    </button>
                     <button
                       style={{ background: viewBg, color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
                       onClick={() => setViewPlan(p)}
@@ -474,9 +578,23 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
             <div style={{ marginBottom: 12, marginTop: 16 }}>
               <h4 style={{ marginBottom: 8 }}>Forwarded (Reviewed) Plans</h4>
               {reviewedForwardedPlans && reviewedForwardedPlans.length ? reviewedForwardedPlans.map(p => (
-                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                  <div style={{ flex: 1 }}>{p.file.split('/').pop()} (by {p.uploader_name})</div>
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, border: '1px solid #ddd', padding: 12, borderRadius: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 'bold', marginBottom: 4 }}>{p.file.split('/').pop()} (by {p.uploader_name})</div>
+                    <div style={{ fontSize: '0.9em', color: '#666' }}>
+                      <div>Uploaded: {p.upload_date ? new Date(p.upload_date).toLocaleString() : 'N/A'}</div>
+                      {p.approved_at_hod && <div>Approved by HoD: {new Date(p.approved_at_hod).toLocaleString()} (by {p.approved_by_hod_username || 'Unknown'})</div>}
+                      {p.approved_at_hod_dept && <div>Approved by HoDept: {new Date(p.approved_at_hod_dept).toLocaleString()} (by {p.approved_by_hod_dept_username || 'Unknown'})</div>}
+                      <div>Awaiting DG Approval</div>
+                    </div>
+                  </div>
                   <span><span style={{ color: '#2563eb', fontWeight: 700, textTransform: 'capitalize' }}>reviewed</span></span>
+                  <button
+                    style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
+                    onClick={() => downloadFile(p.file, p.file.split('/').pop(), p.id, 'plan')}
+                  >
+                    Download
+                  </button>
                   <button
                     style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
                     onClick={() => setViewPlan(p)}
@@ -490,9 +608,22 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
             <div style={{ marginBottom: 12, marginTop: 16 }}>
               <h4 style={{ marginBottom: 8 }}>Rejected Plans</h4>
               {rejectedPlans && rejectedPlans.length ? rejectedPlans.map(p => (
-                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                  <div style={{ flex: 1 }}>{p.file.split('/').pop()} (by {p.uploader_name})</div>
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, border: '1px solid #ddd', padding: 12, borderRadius: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 'bold', marginBottom: 4 }}>{p.file.split('/').pop()} (by {p.uploader_name})</div>
+                    <div style={{ fontSize: '0.9em', color: '#666' }}>
+                      <div>Uploaded: {p.upload_date ? new Date(p.upload_date).toLocaleString() : 'N/A'}</div>
+                      {p.approved_at_hod && <div>Approved by HoD: {new Date(p.approved_at_hod).toLocaleString()} (by {p.approved_by_hod_username || 'Unknown'})</div>}
+                      {p.approved_at_hod_dept && <div>Rejected by HoDept: {new Date(p.approved_at_hod_dept).toLocaleString()} (by {p.approved_by_hod_dept_username || 'Unknown'})</div>}
+                    </div>
+                  </div>
                   <span><span style={{ color: '#dc3545', fontWeight: 700, textTransform: 'capitalize' }}>rejected</span></span>
+                  <button
+                    style={{ background: '#dc3545', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
+                    onClick={() => downloadFile(p.file, p.file.split('/').pop(), p.id, 'plan')}
+                  >
+                    Download
+                  </button>
                   <button
                     style={{ background: '#dc3545', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
                     onClick={() => setViewPlan(p)}
@@ -506,9 +637,23 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
             <div style={{ marginBottom: 12, marginTop: 16 }}>
               <h4 style={{ marginBottom: 8 }}>Approved Plans (Final)</h4>
               {approvedPlans && approvedPlans.length ? approvedPlans.map(p => (
-                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                  <div style={{ flex: 1 }}>{p.file.split('/').pop()} (by {p.uploader_name})</div>
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, border: '1px solid #ddd', padding: 12, borderRadius: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 'bold', marginBottom: 4 }}>{p.file.split('/').pop()} (by {p.uploader_name})</div>
+                    <div style={{ fontSize: '0.9em', color: '#666' }}>
+                      <div>Uploaded: {p.upload_date ? new Date(p.upload_date).toLocaleString() : 'N/A'}</div>
+                      {p.approved_at_hod && <div>Approved by HoD: {new Date(p.approved_at_hod).toLocaleString()} (by {p.approved_by_hod_username || 'Unknown'})</div>}
+                      {p.approved_at_hod_dept && <div>Approved by HoDept: {new Date(p.approved_at_hod_dept).toLocaleString()} (by {p.approved_by_hod_dept_username || 'Unknown'})</div>}
+                      {p.approved_at_dg && <div>Approved by DG: {new Date(p.approved_at_dg).toLocaleString()} (by {p.approved_by_dg_username || 'Unknown'})</div>}
+                    </div>
+                  </div>
                   <span><span style={{ color: '#10b981', fontWeight: 700, textTransform: 'capitalize' }}>approved</span></span>
+                  <button
+                    style={{ background: '#10b981', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
+                    onClick={() => downloadFile(p.file, p.file.split('/').pop(), p.id, 'plan')}
+                  >
+                    Download
+                  </button>
                   <button
                     style={{ background: '#10b981', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
                     onClick={() => setViewPlan(p)}
@@ -523,9 +668,23 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
             <div style={{ marginBottom: 12, marginTop: 16 }}>
               <h4 style={{ marginBottom: 8 }}>Approved Statistics</h4>
               {approvedStats && approvedStats.length ? approvedStats.map(s => (
-                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                  <div style={{ flex: 1 }}>{s.file.split('/').pop()} (by {s.uploader_name})</div>
+                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, border: '1px solid #ddd', padding: 12, borderRadius: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 'bold', marginBottom: 4 }}>{s.file.split('/').pop()} (by {s.uploader_name})</div>
+                    <div style={{ fontSize: '0.9em', color: '#666' }}>
+                      <div>Uploaded: {s.upload_date ? new Date(s.upload_date).toLocaleString() : 'N/A'}</div>
+                      {s.approved_at_hod && <div>Approved by HoD: {new Date(s.approved_at_hod).toLocaleString()} (by {s.approved_by_hod_username || 'Unknown'})</div>}
+                      {s.approved_at_hod_dept && <div>Approved by HoDept: {new Date(s.approved_at_hod_dept).toLocaleString()} (by {s.approved_by_hod_dept_username || 'Unknown'})</div>}
+                      {s.approved_at_dg && <div>Approved by DG: {new Date(s.approved_at_dg).toLocaleString()} (by {s.approved_by_dg_username || 'Unknown'})</div>}
+                    </div>
+                  </div>
                   <span><span style={{ color: '#10b981', fontWeight: 700, textTransform: 'capitalize' }}>approved</span></span>
+                  <button
+                    style={{ background: '#10b981', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
+                    onClick={() => downloadFile(s.file, s.file.split('/').pop(), s.id, 'stat')}
+                  >
+                    Download
+                  </button>
                   <button
                     style={{ background: '#10b981', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
                     onClick={() => setViewStat(s)}
@@ -549,8 +708,15 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
                   : status === 'approved' ? '#28a745'
                   : '#2563eb';
                 return (
-                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                    <div style={{ flex: 1 }}>{s.file.split('/').pop()} (by {s.uploader_name})</div>
+                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, border: '1px solid #ddd', padding: 12, borderRadius: 8 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 'bold', marginBottom: 4 }}>{s.file.split('/').pop()} (by {s.uploader_name})</div>
+                      <div style={{ fontSize: '0.9em', color: '#666' }}>
+                        <div>Uploaded: {s.upload_date ? new Date(s.upload_date).toLocaleString() : 'N/A'}</div>
+                        {s.approved_at_hod && <div>Approved by HoD: {new Date(s.approved_at_hod).toLocaleString()} (by {s.approved_by_hod_username || 'Unknown'})</div>}
+                        <div>Awaiting HoDept Approval</div>
+                      </div>
+                    </div>
                     <span><span style={{ color: statusColor, fontWeight: 700, textTransform: 'capitalize' }}>{status}</span></span>
                     <button
                       style={{ background: viewBg, color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
@@ -591,7 +757,7 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
                     {viewPlan.file.split('/').pop()} (by {viewPlan.uploader_name})
                   </h3>
                   <iframe
-                    src={`http://localhost:2800/media/${viewPlan.file}`}
+                    src={buildFileUrl(viewPlan.file)}
                     title="Plan Document"
                     style={{
                       width: '100%',
@@ -653,7 +819,7 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
                     {viewStat.file.split('/').pop()} (by {viewStat.uploader_name})
                   </h3>
                   <iframe
-                    src={`http://localhost:2800/media/${viewStat.file}`}
+                    src={buildFileUrl(viewStat.file)}
                     title="Statistic Document"
                     style={{ width: '100%', height: '50vh', border: 'none', marginBottom: 16, background: '#f8f9fc' }}
                   />

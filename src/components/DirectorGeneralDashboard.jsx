@@ -95,8 +95,8 @@ export default function DirectorGeneralDashboard({ user, onLogout }) {
         setApprovedPlans(prev => [...prev, { ...viewPlan, status: 'approved' }]);
         setPlans(prev => prev.filter(p => p.id !== planId));
       }
-    } catch (err) {
-      setPopupMessage(err.message || `Failed to ${action} plan`);
+    } catch {
+      setPopupMessage(`Failed to ${action} plan`);
       setPopupType('delete');
     }
   };
@@ -116,10 +116,53 @@ export default function DirectorGeneralDashboard({ user, onLogout }) {
       setPopupMessage(data.message || `Statistic ${action}d`);
       setPopupType(action === 'approve' ? 'update' : 'delete');
       setViewStat(null);
-    } catch (err) {
-      setPopupMessage(err.message || `Failed to ${action} statistic`);
+    } catch {
+      setPopupMessage(`Failed to ${action} statistic`);
       setPopupType('delete');
     }
+  };
+
+  const downloadFile = async (p, type='plan') => {
+    try {
+      const endpoint = type === 'plan' ? `download-plan/${p.id}/` : `download-statistic/${p.id}/`;
+      const url = `http://localhost:2800/api/auth/${endpoint}`;
+      const res = await fetch(url, { headers: { Authorization: `Token ${localStorage.getItem('token')}` } });
+      if (!res.ok) {
+        let detail = '';
+        try { detail = await res.json(); } catch { detail = await res.text(); }
+        console.error('Download error', detail);
+        setPopupMessage((detail && detail.error) || 'Download failed');
+        setPopupType('delete');
+        return;
+      }
+      const blob = await res.blob();
+      const objUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objUrl;
+      a.download = p.file.split('/').pop();
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(objUrl);
+      setPopupMessage('Download started');
+      setPopupType('update');
+    } catch (e) {
+      console.error(e);
+      setPopupMessage('Download failed');
+      setPopupType('delete');
+    }
+  };
+
+  // Normalizer for file paths (avoid double media segments)
+  const buildFileUrl = (filePath) => {
+    if (!filePath) return '';
+    if (filePath.startsWith('http://') || filePath.startsWith('https://')) return filePath;
+    let fp = filePath.trim();
+    while (fp.startsWith('//')) fp = fp.slice(1);
+    if (fp.startsWith('/')) fp = fp.slice(1);
+    if (!fp.startsWith('media/')) fp = `media/${fp}`;
+    fp = fp.replace(/media\/media\//g, 'media/');
+    return `http://localhost:2800/${fp}`;
   };
 
   if (loading) return <div className="dashboard-loading">Loading dashboard...</div>;
@@ -170,15 +213,39 @@ export default function DirectorGeneralDashboard({ user, onLogout }) {
           <div className="recent-activity">
             <h3>Plans Awaiting Approval</h3>
             {plans.length ? plans.map(p => {
+              const status = 'reviewed'; // assuming all are reviewed for DG
+              const statusColor = '#2563eb'; // blue for reviewed
+              const viewBg = '#2563eb'; // blue
               const name = p.file.split('/').pop();
               return (
-                <div key={p.id} className="activity-item">
-                  <div className="activity-info">
-                    <div className="activity-title">{name}</div>
-                    <div className="activity-date">{p.upload_date || p.uploaded_at || ''}</div>
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, border: '1px solid #ddd', padding: 12, borderRadius: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 'bold', marginBottom: 4 }}>{name} (by {p.uploader_name})</div>
+                    <div style={{ fontSize: '0.9em', color: '#666' }}>
+                      <div>Uploaded: {p.upload_date ? new Date(p.upload_date).toLocaleString() : 'N/A'}</div>
+                      {p.approved_at_hod && <div>Approved by HoD: {new Date(p.approved_at_hod).toLocaleString()} (by {p.approved_by_hod_username || 'Unknown'})</div>}
+                      {p.approved_at_hod_dept && <div>Approved by HoDept: {new Date(p.approved_at_hod_dept).toLocaleString()} (by {p.approved_by_hod_dept_username || 'Unknown'})</div>}
+                      <div>Awaiting DG Approval</div>
+                    </div>
                   </div>
-                  <span className="activity-status reviewed">reviewed</span>
-                  <button style={{ marginLeft: 10 }} onClick={() => setViewPlan(p)}>View</button>
+                  <span style={{
+                    background: '', color: statusColor, fontWeight: 700, textTransform: 'capitalize',
+                    padding: '', borderRadius: ''
+                  }}>
+                    {status}
+                  </span>
+                  <button
+                    style={{ background: viewBg, color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
+                    onClick={() => setViewPlan(p)}
+                  >
+                    View
+                  </button>
+                  <button
+                    style={{ background: viewBg, color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
+                    onClick={() => downloadFile(p, 'plan')}
+                  >
+                    Download
+                  </button>
                 </div>
               );
             }) : <p>No plans to approve.</p>}
@@ -187,15 +254,39 @@ export default function DirectorGeneralDashboard({ user, onLogout }) {
           <div className="recent-activity">
             <h3>Statistics Awaiting Approval</h3>
             {stats.length ? stats.map(s => {
+              const status = 'reviewed';
+              const statusColor = '#2563eb';
+              const viewBg = '#2563eb';
               const name = s.file.split('/').pop();
               return (
-                <div key={s.id} className="activity-item">
-                  <div className="activity-info">
-                    <div className="activity-title">{name}</div>
-                    <div className="activity-date">{s.upload_date || s.uploaded_at || ''}</div>
+                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, border: '1px solid #ddd', padding: 12, borderRadius: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 'bold', marginBottom: 4 }}>{name} (by {s.uploader_name})</div>
+                    <div style={{ fontSize: '0.9em', color: '#666' }}>
+                      <div>Uploaded: {s.upload_date ? new Date(s.upload_date).toLocaleString() : 'N/A'}</div>
+                      {s.approved_at_hod && <div>Approved by HoD: {new Date(s.approved_at_hod).toLocaleString()} (by {s.approved_by_hod_username || 'Unknown'})</div>}
+                      {s.approved_at_hod_dept && <div>Approved by HoDept: {new Date(s.approved_at_hod_dept).toLocaleString()} (by {s.approved_by_hod_dept_username || 'Unknown'})</div>}
+                      <div>Awaiting DG Approval</div>
+                    </div>
                   </div>
-                  <span className="activity-status reviewed">reviewed</span>
-                  <button style={{ marginLeft: 10 }} onClick={() => setViewStat(s)}>View</button>
+                  <span style={{
+                    background: '', color: statusColor, fontWeight: 700, textTransform: 'capitalize',
+                    padding: '', borderRadius: ''
+                  }}>
+                    {status}
+                  </span>
+                  <button
+                    style={{ background: viewBg, color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
+                    onClick={() => setViewStat(s)}
+                  >
+                    View
+                  </button>
+                  <button
+                    style={{ background: viewBg, color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
+                    onClick={() => downloadFile(s, 'stat')}
+                  >
+                    Download
+                  </button>
                 </div>
               );
             }) : <p>No statistics to approve.</p>}
@@ -204,15 +295,39 @@ export default function DirectorGeneralDashboard({ user, onLogout }) {
           <div className="recent-activity">
             <h3>Approved Plans</h3>
             {approvedPlans.length ? approvedPlans.map(p => {
+              const status = 'approved';
+              const statusColor = '#10b981'; // green
+              const viewBg = '#28a745'; // green
               const name = p.file.split('/').pop();
               return (
-                <div key={p.id} className="activity-item">
-                  <div className="activity-info">
-                    <div className="activity-title">{name}</div>
-                    <div className="activity-date">{p.upload_date || p.uploaded_at || ''}</div>
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, border: '1px solid #ddd', padding: 12, borderRadius: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 'bold', marginBottom: 4 }}>{name} (by {p.uploader_name})</div>
+                    <div style={{ fontSize: '0.9em', color: '#666' }}>
+                      <div>Uploaded: {p.upload_date ? new Date(p.upload_date).toLocaleString() : 'N/A'}</div>
+                      {p.approved_at_hod && <div>Approved by HoD: {new Date(p.approved_at_hod).toLocaleString()} (by {p.approved_by_hod_username || 'Unknown'})</div>}
+                      {p.approved_at_hod_dept && <div>Approved by HoDept: {new Date(p.approved_at_hod_dept).toLocaleString()} (by {p.approved_by_hod_dept_username || 'Unknown'})</div>}
+                      {p.approved_at_dg && <div>Approved by DG: {new Date(p.approved_at_dg).toLocaleString()} (by {p.approved_by_dg_username || 'Unknown'})</div>}
+                    </div>
                   </div>
-                  <span className="activity-status approved">approved</span>
-                  <button style={{ marginLeft: 10 }} onClick={() => setViewPlan(p)}>View</button>
+                  <span style={{
+                    background: '', color: statusColor, fontWeight: 700, textTransform: 'capitalize',
+                    padding: '', borderRadius: ''
+                  }}>
+                    {status}
+                  </span>
+                  <button
+                    style={{ background: viewBg, color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
+                    onClick={() => setViewPlan(p)}
+                  >
+                    View
+                  </button>
+                  <button
+                    style={{ background: viewBg, color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
+                    onClick={() => downloadFile(p, 'plan')}
+                  >
+                    Download
+                  </button>
                 </div>
               );
             }) : <p>No approved plans.</p>}
@@ -221,15 +336,39 @@ export default function DirectorGeneralDashboard({ user, onLogout }) {
           <div className="recent-activity">
             <h3>Approved Statistics</h3>
             {approvedStats.length ? approvedStats.map(s => {
+              const status = 'approved';
+              const statusColor = '#10b981';
+              const viewBg = '#28a745';
               const name = s.file.split('/').pop();
               return (
-                <div key={s.id} className="activity-item">
-                  <div className="activity-info">
-                    <div className="activity-title">{name}</div>
-                    <div className="activity-date">{s.upload_date || s.uploaded_at || ''}</div>
+                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, border: '1px solid #ddd', padding: 12, borderRadius: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 'bold', marginBottom: 4 }}>{name} (by {s.uploader_name})</div>
+                    <div style={{ fontSize: '0.9em', color: '#666' }}>
+                      <div>Uploaded: {s.upload_date ? new Date(s.upload_date).toLocaleString() : 'N/A'}</div>
+                      {s.approved_at_hod && <div>Approved by HoD: {new Date(s.approved_at_hod).toLocaleString()} (by {s.approved_by_hod_username || 'Unknown'})</div>}
+                      {s.approved_at_hod_dept && <div>Approved by HoDept: {new Date(s.approved_at_hod_dept).toLocaleString()} (by {s.approved_by_hod_dept_username || 'Unknown'})</div>}
+                      {s.approved_at_dg && <div>Approved by DG: {new Date(s.approved_at_dg).toLocaleString()} (by {s.approved_by_dg_username || 'Unknown'})</div>}
+                    </div>
                   </div>
-                  <span className="activity-status approved">approved</span>
-                  <button style={{ marginLeft: 10 }} onClick={() => setViewStat(s)}>View</button>
+                  <span style={{
+                    background: '', color: statusColor, fontWeight: 700, textTransform: 'capitalize',
+                    padding: '', borderRadius: ''
+                  }}>
+                    {status}
+                  </span>
+                  <button
+                    style={{ background: viewBg, color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
+                    onClick={() => setViewStat(s)}
+                  >
+                    View
+                  </button>
+                  <button
+                    style={{ background: viewBg, color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
+                    onClick={() => downloadFile(s, 'stat')}
+                  >
+                    Download
+                  </button>
                 </div>
               );
             }) : <p>No approved statistics.</p>}
@@ -248,7 +387,7 @@ export default function DirectorGeneralDashboard({ user, onLogout }) {
                   {viewPlan.file.split('/').pop()} (by {viewPlan.uploader_name})
                 </h3>
                 <iframe
-                  src={`http://localhost:2800/media/${viewPlan.file}`}
+                  src={buildFileUrl(viewPlan.file)}
                   title="Plan Document"
                   style={{ width: '100%', height: '50vh', border: 'none', marginBottom: 16, background: '#f8f9fc' }}
                 />
@@ -289,7 +428,7 @@ export default function DirectorGeneralDashboard({ user, onLogout }) {
                   {viewStat.file.split('/').pop()} (by {viewStat.uploader_name})
                 </h3>
                 <iframe
-                  src={`http://localhost:2800/media/${viewStat.file}`}
+                  src={buildFileUrl(viewStat.file)}
                   title="Statistic Document"
                   style={{ width: '100%', height: '50vh', border: 'none', marginBottom: 16, background: '#f8f9fc' }}
                 />

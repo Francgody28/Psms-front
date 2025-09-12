@@ -653,22 +653,7 @@ const StatisticsDashboard = ({ user, onLogout }) => {
                       <div className="activity-date">{s.uploaded_at ? new Date(s.uploaded_at).toLocaleString() : ''}</div>
                     </div>
                     <span style={{ color, fontWeight: 700, textTransform: 'capitalize' }}>{status}</span>
-                    {status === 'pending' && (
-                      <>
-                        <button
-                          style={{ background: '#28a745', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer', marginLeft: 10 }}
-                          onClick={() => handleApproveStatisticModal(s.id)}
-                        >
-                          Approve
-                        </button>
-                        <button
-                          style={{ background: '#dc3545', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer', marginLeft: 10 }}
-                          onClick={() => handleRejectStatisticModal(s.id)}
-                        >
-                          Reject
-                        </button>
-                      </>
-                    )}
+                    {/* Removed approve/reject buttons for own uploads */}
                   </div>
                 );
               }) : <p>No uploads yet.</p>}

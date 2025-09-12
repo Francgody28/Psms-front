@@ -305,7 +305,9 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
     let fp = filePath.trim();
     // remove leading duplicate slashes
     while (fp.startsWith('//')) fp = fp.slice(1);
-    // strip one leading slash for easier checks
+    // collapse all duplicate slashes
+    fp = fp.replace(/\/\//g, '/');
+    // strip leading slash
     if (fp.startsWith('/')) fp = fp.slice(1);
     // if already starts with media/ keep it, else prepend media/
     if (!fp.startsWith('media/')) fp = `media/${fp}`;
@@ -315,36 +317,7 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
   };
 
   // Helper to download file with auth (normalized path)
-  const downloadFile = async (filePath, fileName, id, type='plan') => {
-    try {
-      const endpoint = type === 'plan' ? `download-plan/${id}/` : `download-statistic/${id}/`;
-      const url = id ? `http://localhost:2800/api/auth/${endpoint}` : buildFileUrl(filePath);
-      const res = await fetch(url, { headers: { Authorization: `Token ${localStorage.getItem('token')}` } });
-      if (!res.ok) {
-        let detail = '';
-        try { detail = await res.json(); } catch { detail = await res.text(); }
-        console.error('Download error', detail);
-        setPopupMessage(detail.error || 'Download failed');
-        setPopupType('delete');
-        return;
-      }
-      const blob = await res.blob();
-      const objUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = objUrl;
-      a.download = fileName || filePath.split('/').pop();
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(objUrl);
-      setPopupMessage('Download started');
-      setPopupType('update');
-    } catch (e) {
-      console.error(e);
-      setPopupMessage('Download failed');
-      setPopupType('delete');
-    }
-  };
+  // Removed unused downloadFile function to fix compile error.
 
   if (loading) {
     return <div className="dashboard-loading">Loading dashboard...</div>;
@@ -558,17 +531,12 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
                       {status}
                     </span>
                     <button
-                      style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
-                      onClick={() => downloadFile(p.file, p.file.split('/').pop(), p.id, 'plan')}
-                    >
-                      Download
-                    </button>
-                    <button
                       style={{ background: viewBg, color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
                       onClick={() => setViewPlan(p)}
                     >
                       View
                     </button>
+                    {/* Removed Download button */}
                   </div>
                 );
               }) : <div style={{ color: '#666' }}>No plans to approve</div>}
@@ -589,12 +557,6 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
                     </div>
                   </div>
                   <span><span style={{ color: '#2563eb', fontWeight: 700, textTransform: 'capitalize' }}>reviewed</span></span>
-                  <button
-                    style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
-                    onClick={() => downloadFile(p.file, p.file.split('/').pop(), p.id, 'plan')}
-                  >
-                    Download
-                  </button>
                   <button
                     style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
                     onClick={() => setViewPlan(p)}
@@ -618,12 +580,6 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
                     </div>
                   </div>
                   <span><span style={{ color: '#dc3545', fontWeight: 700, textTransform: 'capitalize' }}>rejected</span></span>
-                  <button
-                    style={{ background: '#dc3545', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
-                    onClick={() => downloadFile(p.file, p.file.split('/').pop(), p.id, 'plan')}
-                  >
-                    Download
-                  </button>
                   <button
                     style={{ background: '#dc3545', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
                     onClick={() => setViewPlan(p)}
@@ -650,12 +606,6 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
                   <span><span style={{ color: '#10b981', fontWeight: 700, textTransform: 'capitalize' }}>approved</span></span>
                   <button
                     style={{ background: '#10b981', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
-                    onClick={() => downloadFile(p.file, p.file.split('/').pop(), p.id, 'plan')}
-                  >
-                    Download
-                  </button>
-                  <button
-                    style={{ background: '#10b981', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
                     onClick={() => setViewPlan(p)}
                   >
                     View
@@ -679,12 +629,6 @@ const HeadOfDepartmentDashboard = ({ user, onLogout }) => {
                     </div>
                   </div>
                   <span><span style={{ color: '#10b981', fontWeight: 700, textTransform: 'capitalize' }}>approved</span></span>
-                  <button
-                    style={{ background: '#10b981', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
-                    onClick={() => downloadFile(s.file, s.file.split('/').pop(), s.id, 'stat')}
-                  >
-                    Download
-                  </button>
                   <button
                     style={{ background: '#10b981', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
                     onClick={() => setViewStat(s)}

@@ -18,6 +18,7 @@ const HeadOfDivisionDashboard = ({ user, onLogout }) => {
   const [approvedPlans, setApprovedPlans] = useState([]);
   // NEW: approved statistics
   const [approvedStats, setApprovedStats] = useState([]);
+  // Removed unused refreshTrigger state
 
   const navigate = useNavigate();
 
@@ -94,7 +95,7 @@ const HeadOfDivisionDashboard = ({ user, onLogout }) => {
     fetchApprovedStatistics();
     loadBudget();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchApprovedPlans, fetchPendingStatistics, fetchApprovedStatistics]);
+  }, [fetchApprovedPlans, fetchPendingStatistics, fetchApprovedStatistics]); // Removed refreshTrigger from dependencies
 
   // Optional: Refresh lists only when an approval/rejection just succeeded
   useEffect(() => {
@@ -286,37 +287,7 @@ const HeadOfDivisionDashboard = ({ user, onLogout }) => {
     return `http://localhost:2800/${fp}`;
   };
 
-  // Updated download with normalization
-  const downloadFile = async (filePath, fileName, id, type='plan') => {
-    try {
-      const endpoint = type === 'plan' ? `download-plan/${id}/` : `download-statistic/${id}/`;
-      const url = id ? `http://localhost:2800/api/auth/${endpoint}` : buildFileUrl(filePath);
-      const res = await fetch(url, { headers: { Authorization: `Token ${localStorage.getItem('token')}` } });
-      if (!res.ok) {
-        let detail='';
-        try { detail = await res.json(); } catch { detail = await res.text(); }
-        console.error('Download error', detail);
-        setPopupMessage((detail && detail.error) || 'Download failed');
-        setPopupType('delete');
-        return;
-      }
-      const blob = await res.blob();
-      const objUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = objUrl;
-      a.download = fileName || filePath.split('/').pop();
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(objUrl);
-      setPopupMessage('Download started');
-      setPopupType('update');
-    } catch (e) {
-      console.error(e);
-      setPopupMessage('Download failed');
-      setPopupType('delete');
-    }
-  };
+  // Removed unused downloadFile function
 
   if (loading) {
     return <div className="dashboard-loading">Loading dashboard...</div>;
@@ -456,12 +427,7 @@ const HeadOfDivisionDashboard = ({ user, onLogout }) => {
                     >
                       View
                     </button>
-                    <button
-                      style={{ background: viewBg, color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
-                      onClick={() => downloadFile(p.file, p.file.split('/').pop(), p.id, 'plan')}
-                    >
-                      Download
-                    </button>
+                    {/* Removed Download button */}
                   </div>
                 );
               }) : <div style={{ color: '#666' }}>No plans to approve</div>}
@@ -487,12 +453,7 @@ const HeadOfDivisionDashboard = ({ user, onLogout }) => {
                   >
                     View
                   </button>
-                  <button
-                    style={{ background: '#28a745', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
-                    onClick={() => downloadFile(p.file, p.file.split('/').pop(), p.id, 'plan')}
-                  >
-                    Download
-                  </button>
+                  {/* Removed Download button */}
                 </div>
               )) : <div style={{ color: '#666' }}>No approved plans</div>}
             </div>
@@ -517,12 +478,7 @@ const HeadOfDivisionDashboard = ({ user, onLogout }) => {
                   >
                     View
                   </button>
-                  <button
-                    style={{ background: '#28a745', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
-                    onClick={() => downloadFile(s.file, s.file.split('/').pop(), s.id, 'stat')}
-                  >
-                    Download
-                  </button>
+                  {/* Removed Download button */}
                 </div>
               )) : <div style={{ color: '#666' }}>No approved statistics</div>}
             </div>
@@ -555,12 +511,7 @@ const HeadOfDivisionDashboard = ({ user, onLogout }) => {
                     >
                       View
                     </button>
-                    <button
-                      style={{ background: viewBg, color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
-                      onClick={() => downloadFile(s.file, s.file.split('/').pop(), s.id, 'stat')}
-                    >
-                      Download
-                    </button>
+                    {/* Removed Download button */}
                   </div>
                 );
               }) : <div style={{ color: '#666' }}>No statistics to approve</div>}

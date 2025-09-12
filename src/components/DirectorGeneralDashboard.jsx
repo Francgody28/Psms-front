@@ -122,36 +122,7 @@ export default function DirectorGeneralDashboard({ user, onLogout }) {
     }
   };
 
-  const downloadFile = async (p, type='plan') => {
-    try {
-      const endpoint = type === 'plan' ? `download-plan/${p.id}/` : `download-statistic/${p.id}/`;
-      const url = `http://localhost:2800/api/auth/${endpoint}`;
-      const res = await fetch(url, { headers: { Authorization: `Token ${localStorage.getItem('token')}` } });
-      if (!res.ok) {
-        let detail = '';
-        try { detail = await res.json(); } catch { detail = await res.text(); }
-        console.error('Download error', detail);
-        setPopupMessage((detail && detail.error) || 'Download failed');
-        setPopupType('delete');
-        return;
-      }
-      const blob = await res.blob();
-      const objUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = objUrl;
-      a.download = p.file.split('/').pop();
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(objUrl);
-      setPopupMessage('Download started');
-      setPopupType('update');
-    } catch (e) {
-      console.error(e);
-      setPopupMessage('Download failed');
-      setPopupType('delete');
-    }
-  };
+  // Removed unused downloadFile function to fix compile error.
 
   // Normalizer for file paths (avoid double media segments)
   const buildFileUrl = (filePath) => {
@@ -240,12 +211,6 @@ export default function DirectorGeneralDashboard({ user, onLogout }) {
                   >
                     View
                   </button>
-                  <button
-                    style={{ background: viewBg, color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
-                    onClick={() => downloadFile(p, 'plan')}
-                  >
-                    Download
-                  </button>
                 </div>
               );
             }) : <p>No plans to approve.</p>}
@@ -280,12 +245,6 @@ export default function DirectorGeneralDashboard({ user, onLogout }) {
                     onClick={() => setViewStat(s)}
                   >
                     View
-                  </button>
-                  <button
-                    style={{ background: viewBg, color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
-                    onClick={() => downloadFile(s, 'stat')}
-                  >
-                    Download
                   </button>
                 </div>
               );
@@ -322,12 +281,6 @@ export default function DirectorGeneralDashboard({ user, onLogout }) {
                   >
                     View
                   </button>
-                  <button
-                    style={{ background: viewBg, color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
-                    onClick={() => downloadFile(p, 'plan')}
-                  >
-                    Download
-                  </button>
                 </div>
               );
             }) : <p>No approved plans.</p>}
@@ -362,12 +315,6 @@ export default function DirectorGeneralDashboard({ user, onLogout }) {
                     onClick={() => setViewStat(s)}
                   >
                     View
-                  </button>
-                  <button
-                    style={{ background: viewBg, color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' }}
-                    onClick={() => downloadFile(s, 'stat')}
-                  >
-                    Download
                   </button>
                 </div>
               );
